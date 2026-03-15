@@ -83,7 +83,7 @@ function Login() {
         <div className="login-contact">
           Si no tienes acceso al panel,{" "}
           <a
-            href="https://wa.me/573195264384?text=Hola,%20quiero%20acceso%20al%20panel%20de%20codigos"
+            href="https://wa.me/573185651516?text=Hola,%20quiero%20acceso%20al%20panel%20de%20codigos"
             target="_blank"
             rel="noopener noreferrer"
           >
