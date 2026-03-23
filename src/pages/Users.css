@@ -31,7 +31,7 @@
   border-bottom: 1px solid var(--users-divider);
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  overflow: visible;
 }
 
 .right-bottom {
@@ -315,19 +315,17 @@
 .authorized-emails-container {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  gap: 6px;
 }
 
 .authorized-emails-wrapper {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
   max-height: 220px;
   min-height: 60px;
-  resize: vertical;
   padding-top: 4px;
   padding-right: 2px;
   width: 100%;
