@@ -81,6 +81,37 @@
   white-space: nowrap;
 }
 
+.th-cliente-select {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+  width: 100%;
+  min-width: 160px;
+}
+
+.th-cliente-select:focus {
+  border-bottom-color: rgba(99,102,241,0.6);
+  color: #a5b4fc;
+}
+
+.th-cliente-select option {
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.85rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
 .rentals-table td {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.05);

@@ -71,6 +71,7 @@ function Rentals() {
   const [modalData, setModalData] = useState<any>(null);
   const [filterEstado, setFilterEstado] = useState("todos");
   const [searchText, setSearchText] = useState("");
+  const [filterCliente, setFilterCliente] = useState("");
 
   // Correos disponibles para dropdown al seleccionar cliente
   const [correosDisponibles, setCorreosDisponibles] = useState<string[]>([]);
@@ -177,7 +178,9 @@ function Rentals() {
     const matchEstado =
       filterEstado === "todos" ||
       (filterEstado === "vencer" ? r.dias_restantes >= 0 && r.dias_restantes <= 3 : r.estado === filterEstado);
-    return matchSearch && matchEstado;
+    const matchCliente =
+      filterCliente === "" || r.user_id === parseInt(filterCliente);
+    return matchSearch && matchEstado && matchCliente;
   });
 
   // Alquileres del cliente seleccionado (para el panel de detalle)
@@ -468,7 +471,25 @@ function Rentals() {
           <table className="rentals-table">
             <thead>
               <tr>
-                <th>Cliente</th>
+                <th>
+                  <select
+                    className="th-cliente-select"
+                    value={filterCliente}
+                    onChange={(e) => {
+                      setFilterCliente(e.target.value);
+                      setSelectedClient(e.target.value ? parseInt(e.target.value) : null);
+                    }}
+                  >
+                    <option value="">Todos los clientes</option>
+                    {[...new Map(rentals.map((r) => [r.user_id, r])).values()]
+                      .sort((a, b) => a.cliente_nombre.localeCompare(b.cliente_nombre))
+                      .map((r) => (
+                        <option key={r.user_id} value={r.user_id}>
+                          {r.cliente_nombre}
+                        </option>
+                      ))}
+                  </select>
+                </th>
                 <th>Plataforma</th>
                 <th>Correo cuenta</th>
                 <th>Vence</th>
