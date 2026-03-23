@@ -45,10 +45,7 @@ interface Garantia {
   notas: string;
 }
 
-const PLATAFORMAS = [
-  "Netflix", "Disney+", "Max", "Paramount+", "Prime Video",
-  "Crunchyroll", "Apple TV+", "Spotify", "YouTube Premium", "Otro",
-];
+const DEFAULT_PLATAFORMAS = ["Netflix","Disney+","Max","Paramount+","Prime Video","Crunchyroll","Apple TV+","Spotify","YouTube Premium"];
 
 function addDays(dateStr: string, days: number): string {
   const date = new Date(dateStr);
@@ -59,6 +56,9 @@ function addDays(dateStr: string, days: number): string {
 function Rentals() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [plataformas, setPlataformas] = useState<string[]>(DEFAULT_PLATAFORMAS);
+  const [nuevaPlataforma, setNuevaPlataforma] = useState("");
+  const [showNuevaPlataforma, setShowNuevaPlataforma] = useState(false);
   const [selectedClient, setSelectedClient] = useState<number | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [garantias, setGarantias] = useState<Garantia[]>([]);
@@ -120,6 +120,7 @@ function Rentals() {
   useEffect(() => {
     loadRentals();
     loadUsers();
+    loadPlataformas();
   }, []);
 
   const loadRentals = async () => {
@@ -137,6 +138,33 @@ function Rentals() {
       setUsers(data);
     } catch {
       toast.error("Error cargando usuarios");
+    }
+  };
+
+  const loadPlataformas = async () => {
+    try {
+      const data = await apiFetch("/api/alquileres/plataformas");
+      setPlataformas(data.map((p: any) => p.nombre));
+    } catch {
+      setPlataformas(DEFAULT_PLATAFORMAS);
+    }
+  };
+
+  const handleAgregarPlataforma = async () => {
+    if (!nuevaPlataforma.trim()) return;
+    try {
+      await apiFetch("/api/alquileres/plataformas", {
+        method: "POST",
+        body: JSON.stringify({ nombre: nuevaPlataforma.trim() }),
+      });
+      toast.success(`Plataforma "${nuevaPlataforma.trim()}" agregada`);
+      await loadPlataformas();
+      setFormRental({ ...formRental, plataforma: nuevaPlataforma.trim() });
+      setFormEditar({ ...formEditar, plataforma: nuevaPlataforma.trim() });
+      setNuevaPlataforma("");
+      setShowNuevaPlataforma(false);
+    } catch (err: any) {
+      toast.error(err.message || "Error agregando plataforma");
     }
   };
 
@@ -778,13 +806,35 @@ function Rentals() {
 
                 <select
                   value={formRental.plataforma}
-                  onChange={(e) => setFormRental({ ...formRental, plataforma: e.target.value })}
+                  onChange={(e) => {
+                    if (e.target.value === "__nueva__") {
+                      setShowNuevaPlataforma(true);
+                    } else {
+                      setFormRental({ ...formRental, plataforma: e.target.value });
+                      setShowNuevaPlataforma(false);
+                    }
+                  }}
                 >
                   <option value="">Seleccionar plataforma *</option>
-                  {PLATAFORMAS.map((p) => (
+                  {plataformas.map((p) => (
                     <option key={p} value={p}>{p}</option>
                   ))}
+                  <option value="__nueva__">➕ Agregar nueva plataforma...</option>
                 </select>
+
+                {showNuevaPlataforma && (
+                  <div className="nueva-plataforma-row">
+                    <input
+                      type="text"
+                      placeholder="Nombre de la nueva plataforma"
+                      value={nuevaPlataforma}
+                      onChange={(e) => setNuevaPlataforma(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()}
+                      autoFocus
+                    />
+                    <button className="btn-agregar-plat" onClick={handleAgregarPlataforma}>Agregar</button>
+                  </div>
+                )}
 
                 <label>Fecha inicio *</label>
                 <input
@@ -915,12 +965,34 @@ function Rentals() {
                 <label>Plataforma *</label>
                 <select
                   value={formEditar.plataforma}
-                  onChange={(e) => setFormEditar({ ...formEditar, plataforma: e.target.value })}
+                  onChange={(e) => {
+                    if (e.target.value === "__nueva__") {
+                      setShowNuevaPlataforma(true);
+                    } else {
+                      setFormEditar({ ...formEditar, plataforma: e.target.value });
+                      setShowNuevaPlataforma(false);
+                    }
+                  }}
                 >
-                  {PLATAFORMAS.map((p) => (
+                  {plataformas.map((p) => (
                     <option key={p} value={p}>{p}</option>
                   ))}
+                  <option value="__nueva__">➕ Agregar nueva plataforma...</option>
                 </select>
+
+                {showNuevaPlataforma && (
+                  <div className="nueva-plataforma-row">
+                    <input
+                      type="text"
+                      placeholder="Nombre de la nueva plataforma"
+                      value={nuevaPlataforma}
+                      onChange={(e) => setNuevaPlataforma(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()}
+                      autoFocus
+                    />
+                    <button className="btn-agregar-plat" onClick={handleAgregarPlataforma}>Agregar</button>
+                  </div>
+                )}
                 <label>Correo de la cuenta</label>
                 {correosDisponibles.length > 0 ? (
                   <select

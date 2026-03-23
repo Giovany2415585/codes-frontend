@@ -537,7 +537,33 @@
   color: #f1f5f9;
 }
 
-/* ─── BULK CORREOS ─── */
+/* ─── NUEVA PLATAFORMA ─── */
+
+.nueva-plataforma-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.nueva-plataforma-row input {
+  flex: 1;
+}
+
+.btn-agregar-plat {
+  background: rgba(99,102,241,0.2);
+  border: 1px solid rgba(99,102,241,0.4);
+  border-radius: 8px;
+  color: #a5b4fc;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-agregar-plat:hover {
+  background: rgba(99,102,241,0.35);
+}
 
 .bulk-preview {
   display: flex;
