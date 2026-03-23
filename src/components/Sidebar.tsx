@@ -57,6 +57,9 @@ function Sidebar({ isOpen }: SidebarProps) {
           {user.role === "admin" && (
             <Link to="/users">{t("sidebar.users")}</Link>
           )}
+          {user.role === "admin" && (
+            <Link to="/rentals">Alquileres</Link>
+          )}
           <Link to="/profile">{t("sidebar.profile")}</Link>
         </nav>
       </div>

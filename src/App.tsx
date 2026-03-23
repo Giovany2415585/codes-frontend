@@ -9,6 +9,7 @@ import AuthorizedEmails from "./pages/AuthorizedEmails";
 import Profile from "./pages/Profile";
 import Layout from "./components/Layout";
 import Users from "./pages/Users";
+import Rentals from "./pages/Rentals";   // ← NUEVO
 
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
             <Route path="authorizedEmails" element={<AuthorizedEmails />} />
             <Route path="/users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="rentals" element={<Rentals />} />   {/* ← NUEVO */}
           </Route>
         </Routes>
 
