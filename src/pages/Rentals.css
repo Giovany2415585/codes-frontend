@@ -539,6 +539,87 @@
 
 /* ─── NUEVA PLATAFORMA ─── */
 
+.plataforma-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plataforma-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 4px;
+  background: rgba(255,255,255,0.03);
+}
+
+.plataforma-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: rgba(255,255,255,0.7);
+  transition: background 0.15s;
+}
+
+.plataforma-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: #f1f5f9;
+}
+
+.plataforma-item.selected {
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
+}
+
+.plataforma-item.agregar {
+  color: rgba(165,180,252,0.6);
+  font-size: 0.82rem;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.plataforma-item.agregar:hover {
+  color: #a5b4fc;
+  background: rgba(99,102,241,0.1);
+}
+
+.plat-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  opacity: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.plataforma-item:hover .plat-delete {
+  opacity: 1;
+}
+
+.plat-delete:hover {
+  background: rgba(239,68,68,0.2);
+}
+
+.plataforma-selected-label {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.4);
+  padding: 0 4px;
+}
+
+.plataforma-selected-label strong {
+  color: #a5b4fc;
+}
+
 .nueva-plataforma-row {
   display: flex;
   gap: 8px;

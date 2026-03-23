@@ -47,6 +47,11 @@ interface Garantia {
 
 const DEFAULT_PLATAFORMAS = ["Netflix","Disney+","Max","Paramount+","Prime Video","Crunchyroll","Apple TV+","Spotify","YouTube Premium"];
 
+interface Plataforma {
+  id: number;
+  nombre: string;
+}
+
 function addDays(dateStr: string, days: number): string {
   const date = new Date(dateStr);
   date.setDate(date.getDate() + days);
@@ -56,7 +61,7 @@ function addDays(dateStr: string, days: number): string {
 function Rentals() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [plataformas, setPlataformas] = useState<string[]>(DEFAULT_PLATAFORMAS);
+  const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
   const [nuevaPlataforma, setNuevaPlataforma] = useState("");
   const [showNuevaPlataforma, setShowNuevaPlataforma] = useState(false);
   const [selectedClient, setSelectedClient] = useState<number | null>(null);
@@ -144,9 +149,9 @@ function Rentals() {
   const loadPlataformas = async () => {
     try {
       const data = await apiFetch("/api/alquileres/plataformas");
-      setPlataformas(data.map((p: any) => p.nombre));
+      setPlataformas(data);
     } catch {
-      setPlataformas(DEFAULT_PLATAFORMAS);
+      setPlataformas(DEFAULT_PLATAFORMAS.map((n, i) => ({ id: i + 1, nombre: n })));
     }
   };
 
@@ -165,6 +170,17 @@ function Rentals() {
       setShowNuevaPlataforma(false);
     } catch (err: any) {
       toast.error(err.message || "Error agregando plataforma");
+    }
+  };
+
+  const handleEliminarPlataforma = async (plat: Plataforma) => {
+    if (!confirm(`¿Eliminar "${plat.nombre}" de la lista?`)) return;
+    try {
+      await apiFetch(`/api/alquileres/plataformas/${plat.id}`, { method: "DELETE" });
+      toast.success(`"${plat.nombre}" eliminada`);
+      await loadPlataformas();
+    } catch (err: any) {
+      toast.error(err.message || "Error eliminando plataforma");
     }
   };
 
@@ -804,23 +820,36 @@ function Rentals() {
                   ))}
                 </select>
 
-                <select
-                  value={formRental.plataforma}
-                  onChange={(e) => {
-                    if (e.target.value === "__nueva__") {
-                      setShowNuevaPlataforma(true);
-                    } else {
-                      setFormRental({ ...formRental, plataforma: e.target.value });
-                      setShowNuevaPlataforma(false);
-                    }
-                  }}
-                >
-                  <option value="">Seleccionar plataforma *</option>
-                  {plataformas.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                  <option value="__nueva__">➕ Agregar nueva plataforma...</option>
-                </select>
+                <label>Plataforma *</label>
+                <div className="plataforma-selector">
+                  <div className="plataforma-lista">
+                    {plataformas.map((p) => (
+                      <div
+                        key={p.id}
+                        className={`plataforma-item ${formRental.plataforma === p.nombre ? "selected" : ""}`}
+                        onClick={() => { setFormRental({ ...formRental, plataforma: p.nombre }); setShowNuevaPlataforma(false); }}
+                      >
+                        <span>{p.nombre}</span>
+                        <button
+                          className="plat-delete"
+                          title="Eliminar plataforma"
+                          onClick={(e) => { e.stopPropagation(); handleEliminarPlataforma(p); }}
+                        >🗑️</button>
+                      </div>
+                    ))}
+                    <div
+                      className="plataforma-item agregar"
+                      onClick={() => setShowNuevaPlataforma(!showNuevaPlataforma)}
+                    >
+                      ➕ Agregar nueva plataforma...
+                    </div>
+                  </div>
+                  {formRental.plataforma && (
+                    <div className="plataforma-selected-label">
+                      Seleccionada: <strong>{formRental.plataforma}</strong>
+                    </div>
+                  )}
+                </div>
 
                 {showNuevaPlataforma && (
                   <div className="nueva-plataforma-row">
@@ -963,22 +992,35 @@ function Rentals() {
                   {selectedRental.cliente_nombre} — ID #{selectedRental.id}
                 </p>
                 <label>Plataforma *</label>
-                <select
-                  value={formEditar.plataforma}
-                  onChange={(e) => {
-                    if (e.target.value === "__nueva__") {
-                      setShowNuevaPlataforma(true);
-                    } else {
-                      setFormEditar({ ...formEditar, plataforma: e.target.value });
-                      setShowNuevaPlataforma(false);
-                    }
-                  }}
-                >
-                  {plataformas.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                  <option value="__nueva__">➕ Agregar nueva plataforma...</option>
-                </select>
+                <div className="plataforma-selector">
+                  <div className="plataforma-lista">
+                    {plataformas.map((p) => (
+                      <div
+                        key={p.id}
+                        className={`plataforma-item ${formEditar.plataforma === p.nombre ? "selected" : ""}`}
+                        onClick={() => { setFormEditar({ ...formEditar, plataforma: p.nombre }); setShowNuevaPlataforma(false); }}
+                      >
+                        <span>{p.nombre}</span>
+                        <button
+                          className="plat-delete"
+                          title="Eliminar plataforma"
+                          onClick={(e) => { e.stopPropagation(); handleEliminarPlataforma(p); }}
+                        >🗑️</button>
+                      </div>
+                    ))}
+                    <div
+                      className="plataforma-item agregar"
+                      onClick={() => setShowNuevaPlataforma(!showNuevaPlataforma)}
+                    >
+                      ➕ Agregar nueva plataforma...
+                    </div>
+                  </div>
+                  {formEditar.plataforma && (
+                    <div className="plataforma-selected-label">
+                      Seleccionada: <strong>{formEditar.plataforma}</strong>
+                    </div>
+                  )}
+                </div>
 
                 {showNuevaPlataforma && (
                   <div className="nueva-plataforma-row">

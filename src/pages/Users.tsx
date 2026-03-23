@@ -60,7 +60,7 @@ function Users() {
   const [newSubject, setNewSubject] = useState("");
   const [bulkSubjectName, setBulkSubjectName] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<"edit" | "delete" | "deleteAllEmails" | null>(null);
+  const [modalType, setModalType] = useState<"edit" | "delete" | "deleteAllEmails" | "deleteSelected" | null>(null);
   const [modalEntity, setModalEntity] = useState<"user" | "email" | "subject" | null>(null);
   const [subjectFile, setSubjectFile] = useState<File | null>(null);
   const subjectFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -177,6 +177,21 @@ function Users() {
       setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
     } catch {
       toast.error(t("users.loadEmailsError"));
+    }
+  };
+
+  const handleDeleteSelectedEmails = async () => {
+    if (!selectedUser || selectedEmailIds.length === 0) return;
+    try {
+      for (const id of selectedEmailIds) {
+        await apiFetch(`/api/admin/authorized-emails/${id}`, { method: "DELETE" });
+      }
+      toast.success(`${selectedEmailIds.length} correo(s) eliminado(s)`);
+      const data = await apiFetch(`/api/admin/users/${selectedUser.id}/authorized-emails`);
+      setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
+      setShowModal(false);
+    } catch {
+      toast.error("Error eliminando correos seleccionados");
     }
   };
 
@@ -474,11 +489,21 @@ function Users() {
           <div className="right-top">
             <div className="emails-header">
               <h3>{t("users.authorizedEmails")}</h3>
-              {selectedUser && authorizedEmails.length > 0 && (
-                <button className="btn-danger-small" onClick={() => { setModalType("deleteAllEmails"); setShowModal(true); }}>
-                  🗑 Quitar todos
-                </button>
-              )}
+              <div style={{ display: "flex", gap: "8px" }}>
+                {selectedEmailIds.length > 0 && (
+                  <button
+                    className="btn-danger-small"
+                    onClick={() => { setModalType("deleteSelected"); setShowModal(true); }}
+                  >
+                    🗑 Eliminar {selectedEmailIds.length} seleccionado(s)
+                  </button>
+                )}
+                {selectedUser && authorizedEmails.length > 0 && (
+                  <button className="btn-danger-small" onClick={() => { setModalType("deleteAllEmails"); setShowModal(true); }}>
+                    🗑 Quitar todos
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="authorized-emails-container">
@@ -649,6 +674,16 @@ function Users() {
                 <h3>{t("users.confirmDelete")}</h3>
                 <button onClick={handleConfirm}>{t("users.confirm")}</button>
                 <button onClick={() => setShowModal(false)}>{t("users.cancel")}</button>
+              </>
+            )}
+            {modalType === "deleteSelected" && (
+              <>
+                <h3>¿Eliminar correos seleccionados?</h3>
+                <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>
+                  Se eliminarán {selectedEmailIds.length} correo(s) seleccionado(s) de {selectedUser?.first_name}. Esta acción no se puede deshacer.
+                </p>
+                <button onClick={handleDeleteSelectedEmails}>Eliminar</button>
+                <button onClick={() => setShowModal(false)}>Cancelar</button>
               </>
             )}
             {modalType === "deleteAllEmails" && (
