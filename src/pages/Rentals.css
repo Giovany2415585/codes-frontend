@@ -5,7 +5,6 @@
   gap: 16px;
 }
 
-/* ── HEADER ── */
 .rentals-header {
   display: flex;
   align-items: center;
@@ -20,17 +19,9 @@
   color: var(--text-primary, #f1f5f9);
 }
 
-.rentals-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.rentals-header-left { display: flex; flex-direction: column; gap: 6px; }
 
-.rentals-stats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+.rentals-stats { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .stat-chip {
   font-size: 0.75rem;
@@ -43,12 +34,7 @@
 .stat-chip.urgente { background: rgba(239,68,68,0.15); color: #f87171; }
 .stat-chip.pendiente { background: rgba(251,191,36,0.15); color: #fbbf24; }
 
-/* ── FILTROS ── */
-.rentals-filters {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+.rentals-filters { display: flex; gap: 12px; flex-wrap: wrap; }
 
 .filter-input, .filter-select {
   background: rgba(255,255,255,0.05);
@@ -64,7 +50,6 @@
 .filter-input { min-width: 240px; }
 .filter-input:focus, .filter-select:focus { border-color: rgba(99,102,241,0.6); }
 
-/* ── CARD ── */
 .rentals-card {
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
@@ -72,10 +57,7 @@
   overflow: hidden;
 }
 
-/* ── TABLA ── */
-.rentals-table-wrap {
-  overflow-x: auto;
-}
+.rentals-table-wrap { overflow-x: auto; }
 
 .rentals-table {
   width: 100%;
@@ -100,17 +82,13 @@
 }
 
 .rentals-table td {
-  padding: 11px 14px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   color: var(--text-primary, #f1f5f9);
   vertical-align: middle;
 }
 
-.rental-row {
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
+.rental-row { cursor: pointer; transition: background 0.15s; }
 .rental-row:hover { background: rgba(255,255,255,0.03); }
 .rental-row.selected { background: rgba(99,102,241,0.08); }
 
@@ -120,15 +98,24 @@
   padding: 32px !important;
 }
 
-/* ── CELDAS ── */
-.client-cell {
+.client-cell { display: flex; align-items: center; gap: 10px; }
+
+.client-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
-.client-name { font-weight: 600; }
-.client-email { font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+.client-name { display: block; font-weight: 600; font-size: 0.875rem; }
+.client-email { display: block; font-size: 0.75rem; color: rgba(255,255,255,0.4); }
 
 .plataforma-badge {
   background: rgba(99,102,241,0.15);
@@ -174,14 +161,71 @@
 }
 
 .estado-badge.activo { background: rgba(34,197,94,0.15); color: #4ade80; }
+.estado-badge.urgente { background: rgba(239,68,68,0.15); color: #f87171; }
 .estado-badge.vencido { background: rgba(239,68,68,0.15); color: #f87171; }
 .estado-badge.cancelado { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); }
 
-/* ── ACCIONES ── */
-.action-btns {
-  display: flex;
-  gap: 4px;
+.rental-detail {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 16px;
 }
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.detail-header h3 { margin: 0; font-size: 1rem; color: var(--text-primary, #f1f5f9); }
+
+.detail-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.detail-tabs button {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.5);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+}
+
+.detail-tabs button.active {
+  background: rgba(99,102,241,0.2);
+  border-color: rgba(99,102,241,0.4);
+  color: #a5b4fc;
+}
+
+.detail-list { display: flex; flex-direction: column; gap: 8px; }
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.cuenta-item {
+  justify-content: space-between;
+  border: 1px solid transparent;
+}
+
+.cuenta-item.por-vencer {
+  border-color: rgba(239,68,68,0.2);
+  background: rgba(239,68,68,0.04);
+}
+
+.cuenta-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.cuenta-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 .btn-icon {
   width: 28px;
@@ -205,66 +249,6 @@
 .btn-icon.delete { background: rgba(239,68,68,0.12); color: #f87171; }
 .btn-icon.delete:hover { background: rgba(239,68,68,0.25); }
 
-/* ── DETALLE ── */
-.rental-detail {
-  border-top: 1px solid rgba(255,255,255,0.08);
-  padding: 16px;
-}
-
-.detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.detail-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: var(--text-primary, #f1f5f9);
-}
-
-.detail-tabs {
-  display: flex;
-  gap: 6px;
-}
-
-.detail-tabs button {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  color: rgba(255,255,255,0.5);
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.15s;
-}
-
-.detail-tabs button.active {
-  background: rgba(99,102,241,0.2);
-  border-color: rgba(99,102,241,0.4);
-  color: #a5b4fc;
-}
-
-.detail-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.detail-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.85rem;
-  flex-wrap: wrap;
-}
-
 .metodo-tag {
   background: rgba(255,255,255,0.06);
   padding: 1px 6px;
@@ -277,7 +261,6 @@
 .garantia-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .garantia-desc { color: rgba(255,255,255,0.7); }
 .garantia-reemplazo { color: #4ade80; font-size: 0.8rem; }
-
 .garantia-estado.pendiente { color: #fbbf24; font-weight: 600; font-size: 0.75rem; }
 .garantia-estado.resuelta { color: #4ade80; font-weight: 600; font-size: 0.75rem; }
 
@@ -302,7 +285,6 @@
   margin: 0;
 }
 
-/* ── BOTONES ── */
 .btn-primary {
   background: #6366f1;
   color: white;
@@ -343,7 +325,6 @@
 
 .btn-danger:hover { background: rgba(239,68,68,0.35); }
 
-/* ── MODAL ── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -370,17 +351,9 @@
   overflow-y: auto;
 }
 
-.rentals-modal h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #f1f5f9;
-}
+.rentals-modal h3 { margin: 0; font-size: 1.1rem; color: #f1f5f9; }
 
-.modal-subtitle {
-  color: rgba(255,255,255,0.4);
-  font-size: 0.85rem;
-  margin: 0;
-}
+.modal-subtitle { color: rgba(255,255,255,0.4); font-size: 0.85rem; margin: 0; }
 
 .rentals-modal input,
 .rentals-modal select,
@@ -399,30 +372,17 @@
 
 .rentals-modal input:focus,
 .rentals-modal select:focus,
-.rentals-modal textarea:focus {
-  border-color: rgba(99,102,241,0.5);
-}
+.rentals-modal textarea:focus { border-color: rgba(99,102,241,0.5); }
 
 .rentals-modal textarea { resize: vertical; min-height: 70px; }
 
-.rentals-modal label {
-  font-size: 0.78rem;
-  color: rgba(255,255,255,0.4);
-  margin-bottom: -6px;
-}
+.rentals-modal label { font-size: 0.78rem; color: rgba(255,255,255,0.4); margin-bottom: -6px; }
 
-.modal-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
+.rentals-modal select option { background: #1e293b; color: #f1f5f9; }
 
-/* ── DIAS QUICK ── */
-.dias-quick {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+.modal-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+.dias-quick { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .dias-btn {
   background: rgba(255,255,255,0.05);
@@ -439,10 +399,4 @@
   background: rgba(99,102,241,0.2);
   border-color: rgba(99,102,241,0.4);
   color: #a5b4fc;
-}
-
-/* ── DROPDOWN OPTIONS ── */
-.rentals-modal select option {
-  background: #1e293b;
-  color: #f1f5f9;
 }
