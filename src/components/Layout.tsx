@@ -57,24 +57,14 @@ function Layout() {
           </div>
         </header>
 
-        <main className="content">
+   <main className="content">
           <Outlet />
         </main>
-
         <footer className="footer">
-          © {new Date().getFullYear()} CINEBOX.NET Codes v1 - Dev:&nbsp;
-          <a
-            href="https://wa.me/573024824806"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="whatsapp-link"
-          >
-            Diego Morales
-          </a>
+          © {new Date().getFullYear()} CINEBOX.NET
         </footer>
       </div>
     </div>
   );
 }
-
 export default Layout;
