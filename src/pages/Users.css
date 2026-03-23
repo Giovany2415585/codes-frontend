@@ -6,7 +6,7 @@
   display: flex;
   height: 75vh;
   border-radius: 20px;
-  overflow: hidden;
+  overflow: visible;
   backdrop-filter: blur(20px);
   background: var(--users-card-bg);
 }
@@ -31,7 +31,6 @@
   border-bottom: 1px solid var(--users-divider);
   display: flex;
   flex-direction: column;
-  overflow: visible;
 }
 
 .right-bottom {
@@ -322,8 +321,9 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  height: 220px;
-  overflow-y: auto;
+  height: 260px;
+  max-height: 260px;
+  overflow-y: auto !important;
   overflow-x: hidden;
   padding-top: 4px;
   padding-right: 4px;
