@@ -266,3 +266,31 @@
     font-size: 13px;
   }
 }
+
+.contact-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.contact-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  display: inline-block;
+  transition: opacity 0.2s;
+}
+
+.contact-btn:hover { opacity: 0.85; }
+
+.contact-btn.whatsapp {
+  background: #25d366;
+  color: white;
+}
+
+.contact-btn.telegram {
+  background: #0088cc;
+  color: white;
+}
