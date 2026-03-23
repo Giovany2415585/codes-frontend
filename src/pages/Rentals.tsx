@@ -70,13 +70,18 @@ function Rentals() {
   const [activeTab, setActiveTab] = useState<"cuentas" | "pagos" | "garantias">("cuentas");
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "crear" | "editar" | "renovar" | "pago" | "garantia" | "resolver" | "delete" | null
+    "crear" | "editar" | "renovar" | "pago" | "pagoMasivo" | "garantia" | "resolver" | "delete" | null
   >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
   const [filterEstado, setFilterEstado] = useState("todos");
   const [searchText, setSearchText] = useState("");
   const [filterCliente, setFilterCliente] = useState("");
+  const [selectedCuentas, setSelectedCuentas] = useState<number[]>([]);
+  const [formPagoMasivo, setFormPagoMasivo] = useState({
+    monto: "", fecha_pago: new Date().toISOString().split("T")[0],
+    estado: "pagado", metodo: "efectivo", notas: "",
+  });
 
   // Correos disponibles para dropdown al seleccionar cliente
   const [correosDisponibles, setCorreosDisponibles] = useState<string[]>([]);
@@ -181,6 +186,39 @@ function Rentals() {
       await loadPlataformas();
     } catch (err: any) {
       toast.error(err.message || "Error eliminando plataforma");
+    }
+  };
+
+  const toggleCuenta = (id: number) => {
+    setSelectedCuentas((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllCuentas = () => {
+    if (selectedCuentas.length === clientRentals.length) {
+      setSelectedCuentas([]);
+    } else {
+      setSelectedCuentas(clientRentals.map((r) => r.id));
+    }
+  };
+
+  const handlePagoMasivo = async () => {
+    if (selectedCuentas.length === 0) return;
+    try {
+      for (const id of selectedCuentas) {
+        await apiFetch(`/api/alquileres/${id}/pagos`, {
+          method: "POST",
+          body: JSON.stringify({ ...formPagoMasivo, monto: parseFloat(formPagoMasivo.monto) }),
+        });
+      }
+      toast.success(`Pago registrado en ${selectedCuentas.length} cuenta(s)`);
+      setShowModal(false);
+      setSelectedCuentas([]);
+      setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+      if (selectedClient) refreshClientDetail(selectedClient);
+    } catch (err: any) {
+      toast.error(err.message || "Error registrando pagos");
     }
   };
 
@@ -650,73 +688,78 @@ function Rentals() {
             {/* TAB CUENTAS */}
             {activeTab === "cuentas" && (
               <div className="detail-list">
-                {clientRentals.map((r) => (
-                  <div
-                    key={r.id}
-                    className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""}`}
-                  >
-                    <div className="cuenta-info">
-                      <span className="plataforma-badge">{r.plataforma}</span>
-                      {r.correo && (
-                        <span className="correo-cuenta-detail">📧 {r.correo}</span>
-                      )}
-                      <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                        {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} →{" "}
-                        {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
-                      </span>
-                      <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
-                        {r.dias_restantes < 0
-                          ? `${Math.abs(r.dias_restantes)}d vencido`
-                          : `${r.dias_restantes}d restantes`}
-                      </span>
-                      <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>
-                        {r.pago_estado || "sin pago"}
-                      </span>
-                      {r.precio > 0 && (
+                <div className="cuentas-toolbar">
+                  <label className="checkbox-label-cuenta">
+                    <input
+                      type="checkbox"
+                      checked={selectedCuentas.length === clientRentals.length && clientRentals.length > 0}
+                      onChange={toggleAllCuentas}
+                      style={{ accentColor: "#6c63ff", cursor: "pointer" }}
+                    />
+                    <span>Seleccionar todas</span>
+                    {selectedCuentas.length > 0 && (
+                      <span className="cuentas-sel-count">{selectedCuentas.length} seleccionadas</span>
+                    )}
+                  </label>
+                  {selectedCuentas.length > 0 && (
+                    <button
+                      className="btn-pago-masivo"
+                      onClick={() => {
+                        setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+                        setModalType("pagoMasivo");
+                        setShowModal(true);
+                      }}
+                    >
+                      💳 Registrar pago a {selectedCuentas.length} cuenta(s)
+                    </button>
+                  )}
+                </div>
+                <div className="cuentas-scroll-list">
+                  {clientRentals.map((r) => (
+                    <div
+                      key={r.id}
+                      className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""} ${selectedCuentas.includes(r.id) ? "cuenta-selected" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCuentas.includes(r.id)}
+                        onChange={() => toggleCuenta(r.id)}
+                        style={{ accentColor: "#6c63ff", cursor: "pointer", flexShrink: 0 }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="cuenta-info">
+                        <span className="plataforma-badge">{r.plataforma}</span>
+                        {r.correo && (
+                          <span className="correo-cuenta-detail">📧 {r.correo}</span>
+                        )}
                         <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                          ${Number(r.precio).toLocaleString("es-CO")}
+                          {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} →{" "}
+                          {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
                         </span>
-                      )}
+                        <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
+                          {r.dias_restantes < 0
+                            ? `${Math.abs(r.dias_restantes)}d vencido`
+                            : `${r.dias_restantes}d restantes`}
+                        </span>
+                        <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>
+                          {r.pago_estado || "sin pago"}
+                        </span>
+                        {r.precio > 0 && (
+                          <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+                            ${Number(r.precio).toLocaleString("es-CO")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="cuenta-actions">
+                        <button className="btn-icon editar" title="Editar" onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}>✏️</button>
+                        <button className="btn-icon renovar" title="Renovar" onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}>↻</button>
+                        <button className="btn-icon pago" title="Pago" onClick={(e) => { e.stopPropagation(); openModal("pago", r); }}>💳</button>
+                        <button className="btn-icon garantia" title="Garantía" onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}>🛡️</button>
+                        <button className="btn-icon delete" title="Eliminar" onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}>✕</button>
+                      </div>
                     </div>
-                    <div className="cuenta-actions">
-                      <button
-                        className="btn-icon editar"
-                        title="Editar"
-                        onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="btn-icon renovar"
-                        title="Renovar"
-                        onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}
-                      >
-                        ↻
-                      </button>
-                      <button
-                        className="btn-icon pago"
-                        title="Pago"
-                        onClick={(e) => { e.stopPropagation(); openModal("pago", r); }}
-                      >
-                        💳
-                      </button>
-                      <button
-                        className="btn-icon garantia"
-                        title="Garantía"
-                        onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}
-                      >
-                        🛡️
-                      </button>
-                      <button
-                        className="btn-icon delete"
-                        title="Eliminar"
-                        onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 <button
                   className="btn-agregar-cuenta"
                   onClick={() => {
@@ -1262,6 +1305,55 @@ function Rentals() {
                 />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleResolverGarantia}>Resolver</button>
+                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                </div>
+              </>
+            )}
+
+            {/* MODAL PAGO MASIVO */}
+            {modalType === "pagoMasivo" && (
+              <>
+                <h3>💳 Pago masivo</h3>
+                <p className="modal-subtitle">{selectedCuentas.length} cuenta(s) seleccionada(s)</p>
+                <input
+                  type="number"
+                  placeholder="Monto (COP) *"
+                  value={formPagoMasivo.monto}
+                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, monto: e.target.value })}
+                />
+                <label>Fecha de pago</label>
+                <input
+                  type="date"
+                  value={formPagoMasivo.fecha_pago}
+                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, fecha_pago: e.target.value })}
+                />
+                <select
+                  value={formPagoMasivo.estado}
+                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, estado: e.target.value })}
+                >
+                  <option value="pagado">Pagado</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="vencido">Vencido</option>
+                </select>
+                <select
+                  value={formPagoMasivo.metodo}
+                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, metodo: e.target.value })}
+                >
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="nequi">Nequi</option>
+                  <option value="daviplata">Daviplata</option>
+                  <option value="otro">Otro</option>
+                </select>
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formPagoMasivo.notas}
+                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, notas: e.target.value })}
+                />
+                <div className="modal-actions">
+                  <button className="btn-primary" onClick={handlePagoMasivo}>
+                    Registrar {selectedCuentas.length} pago(s)
+                  </button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>

@@ -519,11 +519,11 @@ function Users() {
 
               <div className="authorized-emails-wrapper">
                 {filteredEmails.map((e) => (
-                  <div key={e.id} className={`subject-chip ${selectedEmail?.id === e.id ? "active" : ""}`}>
+                  <div key={e.id} className={`email-row ${selectedEmail?.id === e.id ? "active" : ""}`}>
                     {selectedUser && (
                       <input type="checkbox" checked={!!e.selected} onChange={() => toggleSelectEmail(e.id)} className="email-checkbox" />
                     )}
-                    <span onClick={() => handleSelectEmail(e)}>{e.email}</span>
+                    <span className="email-row-text" onClick={() => handleSelectEmail(e)}>{e.email}</span>
                     <div className="chip-actions">
                       <div className="chip-btn edit" onClick={() => openEditModal("email", e)}>✎</div>
                       <div className="chip-btn delete" onClick={() => openDeleteModal("email", e)}>✕</div>

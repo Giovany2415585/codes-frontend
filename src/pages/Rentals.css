@@ -57,7 +57,73 @@
   overflow: hidden;
 }
 
-.rentals-table-wrap { overflow-x: auto; }
+.rentals-table-wrap {
+  overflow-x: auto;
+  max-height: 420px;
+  overflow-y: auto;
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* ─── PANEL DETALLE CON SCROLL ─── */
+
+.cuentas-scroll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+  resize: vertical;
+  min-height: 80px;
+  padding-right: 4px;
+}
+
+.cuentas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 6px;
+}
+
+.checkbox-label-cuenta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.cuentas-sel-count {
+  font-size: 0.75rem;
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.btn-pago-masivo {
+  background: rgba(34,197,94,0.15);
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: 8px;
+  color: #4ade80;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-pago-masivo:hover { background: rgba(34,197,94,0.28); }
+
+.cuenta-selected {
+  background: rgba(99,102,241,0.1) !important;
+  border-color: rgba(99,102,241,0.3) !important;
+}
 
 .rentals-table {
   width: 100%;
