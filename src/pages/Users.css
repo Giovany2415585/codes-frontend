@@ -324,11 +324,14 @@
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: 220px;
   min-height: 60px;
   resize: vertical;
   padding-top: 4px;
   padding-right: 2px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .authorized-search-bottom {
@@ -871,8 +874,8 @@
   border: 1px solid rgba(108,99,255,0.25);
   transition: all 0.25s ease;
   cursor: pointer;
-  width: fit-content;
-  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .email-row:hover {
