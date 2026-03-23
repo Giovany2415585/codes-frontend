@@ -127,6 +127,18 @@
   white-space: nowrap;
 }
 
+/* Correo de la cuenta dentro del detalle */
+.cuenta-correo {
+  font-size: 0.78rem;
+  color: #67e8f9;
+  background: rgba(6,182,212,0.1);
+  border: 1px solid rgba(6,182,212,0.2);
+  border-radius: 5px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
 .dias-badge {
   padding: 2px 8px;
   border-radius: 6px;
@@ -240,6 +252,10 @@
   transition: background 0.15s;
 }
 
+/* Botón editar (nuevo) */
+.btn-icon.editar { background: rgba(14,165,233,0.12); color: #38bdf8; }
+.btn-icon.editar:hover { background: rgba(14,165,233,0.25); }
+
 .btn-icon.renovar { background: rgba(99,102,241,0.15); color: #a5b4fc; }
 .btn-icon.renovar:hover { background: rgba(99,102,241,0.3); }
 .btn-icon.pago { background: rgba(34,197,94,0.12); color: #4ade80; }
@@ -248,6 +264,24 @@
 .btn-icon.garantia:hover { background: rgba(251,191,36,0.25); }
 .btn-icon.delete { background: rgba(239,68,68,0.12); color: #f87171; }
 .btn-icon.delete:hover { background: rgba(239,68,68,0.25); }
+
+/* Botón agregar cuenta */
+.btn-agregar-cuenta {
+  align-self: flex-start;
+  background: rgba(99,102,241,0.08);
+  border: 1px dashed rgba(99,102,241,0.3);
+  border-radius: 8px;
+  color: #a5b4fc;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  margin-top: 4px;
+  transition: all 0.15s;
+}
+.btn-agregar-cuenta:hover {
+  background: rgba(99,102,241,0.18);
+  border-color: rgba(99,102,241,0.5);
+}
 
 .metodo-tag {
   background: rgba(255,255,255,0.06);

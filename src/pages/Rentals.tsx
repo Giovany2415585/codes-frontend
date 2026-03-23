@@ -9,6 +9,7 @@ interface Rental {
   cliente_nombre: string;
   cliente_email: string;
   plataforma: string;
+  correo: string | null;
   fecha_inicio: string;
   fecha_fin: string;
   precio: number;
@@ -49,7 +50,10 @@ interface ClientGroup {
   rentals: Rental[];
 }
 
-const PLATAFORMAS = ["Netflix", "Disney+", "Max", "Paramount+", "Prime Video", "Crunchyroll", "Apple TV+", "Spotify", "YouTube Premium", "Otro"];
+const PLATAFORMAS = [
+  "Netflix", "Disney+", "Max", "Paramount+", "Prime Video",
+  "Crunchyroll", "Apple TV+", "Spotify", "YouTube Premium", "Otro",
+];
 
 function addDays(dateStr: string, days: number): string {
   const date = new Date(dateStr);
@@ -64,21 +68,41 @@ function Rentals() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [garantias, setGarantias] = useState<Garantia[]>([]);
   const [activeTab, setActiveTab] = useState<"cuentas" | "pagos" | "garantias">("cuentas");
+
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<"crear" | "renovar" | "pago" | "garantia" | "resolver" | "delete" | null>(null);
+  const [modalType, setModalType] = useState<
+    "crear" | "renovar" | "pago" | "garantia" | "resolver" | "delete" | "editar" | null
+  >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
+
   const [filterEstado, setFilterEstado] = useState("todos");
   const [searchText, setSearchText] = useState("");
+
+  // Correos autorizados del cliente seleccionado en el formulario crear/editar
+  const [correosCliente, setCorreosCliente] = useState<string[]>([]);
 
   const [formRental, setFormRental] = useState({
     user_id: "",
     plataforma: "",
+    correo: "",
     fecha_inicio: new Date().toISOString().split("T")[0],
     dias: "30",
     precio: "",
     notas: "",
   });
+
+  const [formEditar, setFormEditar] = useState({
+    plataforma: "",
+    correo: "",
+    fecha_inicio: "",
+    dias: "30",
+    precio: "",
+    estado: "activo",
+    notas: "",
+  });
+  const [correosEditar, setCorreosEditar] = useState<string[]>([]);
+
   const [formDias, setFormDias] = useState("30");
   const [formPago, setFormPago] = useState({
     monto: "",
@@ -118,6 +142,17 @@ function Rentals() {
     }
   };
 
+  const loadCorreosCliente = async (user_id: string | number, setter: (emails: string[]) => void) => {
+    if (!user_id) { setter([]); return; }
+    try {
+      const data = await apiFetch(`/api/alquileres/correos-usuario/${user_id}`);
+      setter(data);
+    } catch {
+      setter([]);
+    }
+  };
+
+  // ─── Agrupado por cliente ──────────────────────────────────────────────────
   const clientGroups: ClientGroup[] = [];
   rentals.forEach((r) => {
     const existing = clientGroups.find((g) => g.user_id === r.user_id);
@@ -133,7 +168,14 @@ function Rentals() {
     }
   });
 
-  const filteredGroups = clientGroups.filter((g) => {
+  // Ordenar grupos por fecha de vencimiento más próxima
+  const sortedGroups = [...clientGroups].sort((a, b) => {
+    const minA = Math.min(...a.rentals.map((r) => r.dias_restantes));
+    const minB = Math.min(...b.rentals.map((r) => r.dias_restantes));
+    return minA - minB;
+  });
+
+  const filteredGroups = sortedGroups.filter((g) => {
     const matchSearch =
       g.cliente_nombre?.toLowerCase().includes(searchText.toLowerCase()) ||
       g.cliente_email?.toLowerCase().includes(searchText.toLowerCase());
@@ -181,6 +223,8 @@ function Rentals() {
     setGarantias(allGarantias);
   };
 
+  // ─── Handlers ─────────────────────────────────────────────────────────────
+
   const handleCreateRental = async () => {
     if (!formRental.user_id || !formRental.plataforma || !formRental.fecha_inicio || !formRental.dias) {
       toast.error("Completa los campos obligatorios");
@@ -193,6 +237,7 @@ function Rentals() {
         body: JSON.stringify({
           user_id: parseInt(formRental.user_id),
           plataforma: formRental.plataforma,
+          correo: formRental.correo || null,
           fecha_inicio: formRental.fecha_inicio,
           fecha_fin,
           precio: parseFloat(formRental.precio) || 0,
@@ -201,10 +246,42 @@ function Rentals() {
       });
       toast.success("Alquiler creado");
       setShowModal(false);
-      setFormRental({ user_id: "", plataforma: "", fecha_inicio: new Date().toISOString().split("T")[0], dias: "30", precio: "", notas: "" });
+      setFormRental({
+        user_id: "", plataforma: "", correo: "",
+        fecha_inicio: new Date().toISOString().split("T")[0],
+        dias: "30", precio: "", notas: "",
+      });
+      setCorreosCliente([]);
       loadRentals();
     } catch (err: any) {
       toast.error(err.message || "Error creando alquiler");
+    }
+  };
+
+  const handleEditarRental = async () => {
+    if (!selectedRental) return;
+    const fecha_fin = addDays(formEditar.fecha_inicio, parseInt(formEditar.dias));
+    try {
+      await apiFetch(`/api/alquileres/${selectedRental.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          plataforma: formEditar.plataforma,
+          correo: formEditar.correo || null,
+          fecha_inicio: formEditar.fecha_inicio,
+          fecha_fin,
+          precio: parseFloat(formEditar.precio) || 0,
+          estado: formEditar.estado,
+          notas: formEditar.notas,
+        }),
+      });
+      toast.success("Alquiler actualizado");
+      setShowModal(false);
+      loadRentals();
+      if (selectedClient) {
+        setTimeout(() => handleSelectClient(selectedClient), 300);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error actualizando alquiler");
     }
   };
 
@@ -219,8 +296,7 @@ function Rentals() {
       setShowModal(false);
       loadRentals();
       if (selectedClient) {
-        const updated = { ...selectedClient };
-        setSelectedClient(updated);
+        setTimeout(() => handleSelectClient(selectedClient), 300);
       }
     } catch (err: any) {
       toast.error(err.message || "Error renovando");
@@ -289,6 +365,37 @@ function Rentals() {
     setModalType(type);
     setSelectedRental(rental || null);
     setModalData(data || null);
+
+    if (type === "editar" && rental) {
+      const diasCalc = Math.round(
+        (new Date(rental.fecha_fin).getTime() - new Date(rental.fecha_inicio).getTime()) /
+        (1000 * 60 * 60 * 24)
+      );
+      setFormEditar({
+        plataforma: rental.plataforma,
+        correo: rental.correo || "",
+        fecha_inicio: rental.fecha_inicio.split("T")[0],
+        dias: String(diasCalc > 0 ? diasCalc : 30),
+        precio: String(rental.precio || ""),
+        estado: rental.estado,
+        notas: rental.notas || "",
+      });
+      loadCorreosCliente(rental.user_id, setCorreosEditar);
+    }
+
+    if (type === "renovar") {
+      setFormDias("30");
+    }
+    if (type === "pago") {
+      setFormPago({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+    }
+    if (type === "garantia") {
+      setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
+    }
+    if (type === "resolver") {
+      setFormResolver({ cuenta_reemplazo: "", notas: "" });
+    }
+
     setShowModal(true);
   };
 
@@ -305,6 +412,7 @@ function Rentals() {
 
   return (
     <div className="rentals-container">
+      {/* ─── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="rentals-header">
         <div className="rentals-header-left">
           <h2>Alquileres</h2>
@@ -314,13 +422,32 @@ function Rentals() {
             <span className="stat-chip pendiente">{totalPendiente} pago pendiente</span>
           </div>
         </div>
-        <button className="btn-primary" onClick={() => { setModalType("crear"); setShowModal(true); }}>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setFormRental({
+              user_id: "", plataforma: "", correo: "",
+              fecha_inicio: new Date().toISOString().split("T")[0],
+              dias: "30", precio: "", notas: "",
+            });
+            setCorreosCliente([]);
+            setModalType("crear");
+            setShowModal(true);
+          }}
+        >
           + Nuevo alquiler
         </button>
       </div>
 
+      {/* ─── FILTROS ─────────────────────────────────────────────────────────── */}
       <div className="rentals-filters">
-        <input type="text" placeholder="Buscar cliente..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="filter-input" />
+        <input
+          type="text"
+          placeholder="Buscar cliente..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="filter-input"
+        />
         <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="filter-select">
           <option value="todos">Todos</option>
           <option value="activo">Activos</option>
@@ -330,6 +457,7 @@ function Rentals() {
         </select>
       </div>
 
+      {/* ─── TABLA ──────────────────────────────────────────────────────────── */}
       <div className="rentals-card">
         <div className="rentals-table-wrap">
           <table className="rentals-table">
@@ -346,9 +474,14 @@ function Rentals() {
               {filteredGroups.map((group) => {
                 const status = getGroupStatus(group);
                 const minVence = getMinVence(group);
-                const initials = group.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
+                const initials =
+                  group.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
                 return (
-                  <tr key={group.user_id} className={`rental-row ${selectedClient?.user_id === group.user_id ? "selected" : ""}`} onClick={() => handleSelectClient(group)}>
+                  <tr
+                    key={group.user_id}
+                    className={`rental-row ${selectedClient?.user_id === group.user_id ? "selected" : ""}`}
+                    onClick={() => handleSelectClient(group)}
+                  >
                     <td>
                       <div className="client-cell">
                         <div className="client-avatar">{initials}</div>
@@ -361,10 +494,14 @@ function Rentals() {
                     <td>{group.rentals.length} cuenta{group.rentals.length > 1 ? "s" : ""}</td>
                     <td>
                       <div>
-                        <span style={{ fontSize: "0.8rem" }}>{new Date(minVence.fecha_fin).toLocaleDateString("es-CO")}</span>
+                        <span style={{ fontSize: "0.8rem" }}>
+                          {new Date(minVence.fecha_fin).toLocaleDateString("es-CO")}
+                        </span>
                         <br />
                         <span className={`dias-badge ${getDiasColor(minVence.dias_restantes)}`}>
-                          {minVence.dias_restantes < 0 ? `${Math.abs(minVence.dias_restantes)}d vencido` : `${minVence.dias_restantes}d`}
+                          {minVence.dias_restantes < 0
+                            ? `${Math.abs(minVence.dias_restantes)}d vencido`
+                            : `${minVence.dias_restantes}d`}
                         </span>
                       </div>
                     </td>
@@ -373,54 +510,131 @@ function Rentals() {
                         {status === "vencer" ? "por vencer" : status}
                       </span>
                     </td>
-                    <td style={{ textAlign: "right", fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>Ver ▶</td>
+                    <td style={{ textAlign: "right", fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>
+                      Ver ▶
+                    </td>
                   </tr>
                 );
               })}
               {filteredGroups.length === 0 && (
-                <tr><td colSpan={5} className="empty-row">No hay clientes con alquileres</td></tr>
+                <tr>
+                  <td colSpan={5} className="empty-row">No hay clientes con alquileres</td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
 
+        {/* ─── DETALLE CLIENTE ─────────────────────────────────────────────── */}
         {selectedClient && (
           <div className="rental-detail">
             <div className="detail-header">
-              <h3>{selectedClient.cliente_nombre}</h3>
+              <h3>👤 {selectedClient.cliente_nombre}</h3>
               <div className="detail-tabs">
-                <button className={activeTab === "cuentas" ? "active" : ""} onClick={() => setActiveTab("cuentas")}>📦 Cuentas ({selectedClient.rentals.length})</button>
-                <button className={activeTab === "pagos" ? "active" : ""} onClick={() => setActiveTab("pagos")}>💳 Pagos ({pagos.length})</button>
-                <button className={activeTab === "garantias" ? "active" : ""} onClick={() => setActiveTab("garantias")}>🛡️ Garantías ({garantias.length})</button>
+                <button
+                  className={activeTab === "cuentas" ? "active" : ""}
+                  onClick={() => setActiveTab("cuentas")}
+                >
+                  📦 Cuentas ({selectedClient.rentals.length})
+                </button>
+                <button
+                  className={activeTab === "pagos" ? "active" : ""}
+                  onClick={() => setActiveTab("pagos")}
+                >
+                  💳 Pagos ({pagos.length})
+                </button>
+                <button
+                  className={activeTab === "garantias" ? "active" : ""}
+                  onClick={() => setActiveTab("garantias")}
+                >
+                  🛡️ Garantías ({garantias.length})
+                </button>
               </div>
             </div>
 
+            {/* Tab: Cuentas */}
             {activeTab === "cuentas" && (
               <div className="detail-list">
-                {selectedClient.rentals.map((r) => (
-                  <div key={r.id} className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""}`}>
-                    <div className="cuenta-info">
-                      <span className="plataforma-badge">{r.plataforma}</span>
-                      <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                        {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} → {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
-                      </span>
-                      <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
-                        {r.dias_restantes < 0 ? `${Math.abs(r.dias_restantes)}d vencido` : `${r.dias_restantes}d restantes`}
-                      </span>
-                      <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>{r.pago_estado || "sin pago"}</span>
-                      {r.precio > 0 && <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>${Number(r.precio).toLocaleString("es-CO")}</span>}
+                {selectedClient.rentals
+                  .slice()
+                  .sort((a, b) => a.dias_restantes - b.dias_restantes)
+                  .map((r) => (
+                    <div
+                      key={r.id}
+                      className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""}`}
+                    >
+                      <div className="cuenta-info">
+                        <span className="plataforma-badge">{r.plataforma}</span>
+                        {r.correo && (
+                          <span className="cuenta-correo">{r.correo}</span>
+                        )}
+                        <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+                          {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} →{" "}
+                          {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
+                        </span>
+                        <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
+                          {r.dias_restantes < 0
+                            ? `${Math.abs(r.dias_restantes)}d vencido`
+                            : `${r.dias_restantes}d restantes`}
+                        </span>
+                        <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>
+                          {r.pago_estado || "sin pago"}
+                        </span>
+                        {r.precio > 0 && (
+                          <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+                            ${Number(r.precio).toLocaleString("es-CO")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="cuenta-actions">
+                        <button
+                          className="btn-icon editar"
+                          title="Editar"
+                          onClick={() => openModal("editar", r)}
+                        >✏️</button>
+                        <button
+                          className="btn-icon renovar"
+                          title="Renovar"
+                          onClick={() => openModal("renovar", r)}
+                        >↻</button>
+                        <button
+                          className="btn-icon pago"
+                          title="Pago"
+                          onClick={() => openModal("pago", r)}
+                        >💳</button>
+                        <button
+                          className="btn-icon garantia"
+                          title="Garantía"
+                          onClick={() => openModal("garantia", r)}
+                        >🛡️</button>
+                        <button
+                          className="btn-icon delete"
+                          title="Eliminar"
+                          onClick={() => openModal("delete", r)}
+                        >✕</button>
+                      </div>
                     </div>
-                    <div className="cuenta-actions">
-                      <button className="btn-icon renovar" title="Renovar" onClick={() => openModal("renovar", r)}>↻</button>
-                      <button className="btn-icon pago" title="Pago" onClick={() => openModal("pago", r)}>💳</button>
-                      <button className="btn-icon garantia" title="Garantía" onClick={() => openModal("garantia", r)}>🛡️</button>
-                      <button className="btn-icon delete" title="Eliminar" onClick={() => openModal("delete", r)}>✕</button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                <button
+                  className="btn-agregar-cuenta"
+                  onClick={() => {
+                    setFormRental({
+                      user_id: String(selectedClient.user_id),
+                      plataforma: "", correo: "",
+                      fecha_inicio: new Date().toISOString().split("T")[0],
+                      dias: "30", precio: "", notas: "",
+                    });
+                    loadCorreosCliente(selectedClient.user_id, setCorreosCliente);
+                    setModalType("crear");
+                    setShowModal(true);
+                  }}
+                >
+                  + Agregar cuenta
+                </button>
               </div>
             )}
 
+            {/* Tab: Pagos */}
             {activeTab === "pagos" && (
               <div className="detail-list">
                 {pagos.length === 0 && <p className="empty-msg">Sin pagos registrados</p>}
@@ -428,13 +642,16 @@ function Rentals() {
                   <div key={i} className="detail-item">
                     <span className={`pago-badge ${p.estado}`}>{p.estado}</span>
                     <span>${Number(p.monto).toLocaleString("es-CO")}</span>
-                    <span style={{ fontSize: "0.8rem" }}>{new Date(p.fecha_pago).toLocaleDateString("es-CO")}</span>
+                    <span style={{ fontSize: "0.8rem" }}>
+                      {new Date(p.fecha_pago).toLocaleDateString("es-CO")}
+                    </span>
                     <span className="metodo-tag">{p.metodo}</span>
                   </div>
                 ))}
               </div>
             )}
 
+            {/* Tab: Garantías */}
             {activeTab === "garantias" && (
               <div className="detail-list">
                 {garantias.length === 0 && <p className="empty-msg">Sin garantías registradas</p>}
@@ -443,10 +660,17 @@ function Rentals() {
                     <div className="garantia-info">
                       <span className={`garantia-estado ${g.estado}`}>{g.estado}</span>
                       <span className="garantia-desc">{g.descripcion}</span>
-                      {g.cuenta_reemplazo && <span className="garantia-reemplazo">→ {g.cuenta_reemplazo}</span>}
+                      {g.cuenta_reemplazo && (
+                        <span className="garantia-reemplazo">→ {g.cuenta_reemplazo}</span>
+                      )}
                     </div>
                     {g.estado === "pendiente" && (
-                      <button className="btn-resolver" onClick={() => openModal("resolver", undefined, g)}>Resolver</button>
+                      <button
+                        className="btn-resolver"
+                        onClick={() => openModal("resolver", undefined, g)}
+                      >
+                        Resolver
+                      </button>
                     )}
                   </div>
                 ))}
@@ -456,37 +680,98 @@ function Rentals() {
         )}
       </div>
 
+      {/* ─── MODALES ────────────────────────────────────────────────────────── */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal rentals-modal" onClick={(e) => e.stopPropagation()}>
 
+            {/* CREAR */}
             {modalType === "crear" && (
               <>
                 <h3>Nuevo Alquiler</h3>
-                <select value={formRental.user_id} onChange={(e) => setFormRental({ ...formRental, user_id: e.target.value })}>
+                <select
+                  value={formRental.user_id}
+                  onChange={(e) => {
+                    setFormRental({ ...formRental, user_id: e.target.value, correo: "" });
+                    loadCorreosCliente(e.target.value, setCorreosCliente);
+                  }}
+                >
                   <option value="">Seleccionar cliente *</option>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.first_name} — {u.email}</option>)}
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.first_name} — {u.email}</option>
+                  ))}
                 </select>
-                <select value={formRental.plataforma} onChange={(e) => setFormRental({ ...formRental, plataforma: e.target.value })}>
+
+                <select
+                  value={formRental.plataforma}
+                  onChange={(e) => setFormRental({ ...formRental, plataforma: e.target.value })}
+                >
                   <option value="">Seleccionar plataforma *</option>
                   {PLATAFORMAS.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
+
+                <label>Correo de la cuenta</label>
+                {correosCliente.length > 0 ? (
+                  <select
+                    value={formRental.correo}
+                    onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
+                  >
+                    <option value="">Sin correo asignado</option>
+                    {correosCliente.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="correo@ejemplo.com (opcional)"
+                    value={formRental.correo}
+                    onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
+                  />
+                )}
+
                 <label>Fecha inicio *</label>
-                <input type="date" value={formRental.fecha_inicio} onChange={(e) => setFormRental({ ...formRental, fecha_inicio: e.target.value })} />
+                <input
+                  type="date"
+                  value={formRental.fecha_inicio}
+                  onChange={(e) => setFormRental({ ...formRental, fecha_inicio: e.target.value })}
+                />
+
                 <label>Días asignados *</label>
                 <div className="dias-quick">
                   {[7, 15, 30, 60].map((d) => (
-                    <button key={d} className={`dias-btn ${formRental.dias === String(d) ? "active" : ""}`} onClick={() => setFormRental({ ...formRental, dias: String(d) })}>{d}d</button>
+                    <button
+                      key={d}
+                      className={`dias-btn ${formRental.dias === String(d) ? "active" : ""}`}
+                      onClick={() => setFormRental({ ...formRental, dias: String(d) })}
+                    >{d}d</button>
                   ))}
                 </div>
-                <input type="number" placeholder="Días" value={formRental.dias} onChange={(e) => setFormRental({ ...formRental, dias: e.target.value })} min="1" />
+                <input
+                  type="number"
+                  placeholder="Días"
+                  value={formRental.dias}
+                  onChange={(e) => setFormRental({ ...formRental, dias: e.target.value })}
+                  min="1"
+                />
                 {formRental.fecha_inicio && formRental.dias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
-                    📅 Vence: {new Date(addDays(formRental.fecha_inicio, parseInt(formRental.dias) || 0)).toLocaleDateString("es-CO")}
+                    📅 Vence:{" "}
+                    {new Date(
+                      addDays(formRental.fecha_inicio, parseInt(formRental.dias) || 0)
+                    ).toLocaleDateString("es-CO")}
                   </p>
                 )}
-                <input type="number" placeholder="Precio (COP)" value={formRental.precio} onChange={(e) => setFormRental({ ...formRental, precio: e.target.value })} />
-                <textarea placeholder="Notas (opcional)" value={formRental.notas} onChange={(e) => setFormRental({ ...formRental, notas: e.target.value })} />
+
+                <input
+                  type="number"
+                  placeholder="Precio (COP)"
+                  value={formRental.precio}
+                  onChange={(e) => setFormRental({ ...formRental, precio: e.target.value })}
+                />
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formRental.notas}
+                  onChange={(e) => setFormRental({ ...formRental, notas: e.target.value })}
+                />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleCreateRental}>Crear</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -494,20 +779,132 @@ function Rentals() {
               </>
             )}
 
+            {/* EDITAR */}
+            {modalType === "editar" && selectedRental && (
+              <>
+                <h3>✏️ Editar cuenta</h3>
+                <p className="modal-subtitle">{selectedRental.plataforma} — {selectedRental.cliente_nombre}</p>
+
+                <label>Plataforma</label>
+                <select
+                  value={formEditar.plataforma}
+                  onChange={(e) => setFormEditar({ ...formEditar, plataforma: e.target.value })}
+                >
+                  {PLATAFORMAS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+
+                <label>Correo de la cuenta</label>
+                {correosEditar.length > 0 ? (
+                  <select
+                    value={formEditar.correo}
+                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
+                  >
+                    <option value="">Sin correo asignado</option>
+                    {correosEditar.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="correo@ejemplo.com (opcional)"
+                    value={formEditar.correo}
+                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
+                  />
+                )}
+
+                <label>Fecha inicio</label>
+                <input
+                  type="date"
+                  value={formEditar.fecha_inicio}
+                  onChange={(e) => setFormEditar({ ...formEditar, fecha_inicio: e.target.value })}
+                />
+
+                <label>Días asignados</label>
+                <div className="dias-quick">
+                  {[7, 15, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      className={`dias-btn ${formEditar.dias === String(d) ? "active" : ""}`}
+                      onClick={() => setFormEditar({ ...formEditar, dias: String(d) })}
+                    >{d}d</button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  placeholder="Días"
+                  value={formEditar.dias}
+                  onChange={(e) => setFormEditar({ ...formEditar, dias: e.target.value })}
+                  min="1"
+                />
+                {formEditar.fecha_inicio && formEditar.dias && (
+                  <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
+                    📅 Vence:{" "}
+                    {new Date(
+                      addDays(formEditar.fecha_inicio, parseInt(formEditar.dias) || 0)
+                    ).toLocaleDateString("es-CO")}
+                  </p>
+                )}
+
+                <input
+                  type="number"
+                  placeholder="Precio (COP)"
+                  value={formEditar.precio}
+                  onChange={(e) => setFormEditar({ ...formEditar, precio: e.target.value })}
+                />
+
+                <label>Estado</label>
+                <select
+                  value={formEditar.estado}
+                  onChange={(e) => setFormEditar({ ...formEditar, estado: e.target.value })}
+                >
+                  <option value="activo">Activo</option>
+                  <option value="vencido">Vencido</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formEditar.notas}
+                  onChange={(e) => setFormEditar({ ...formEditar, notas: e.target.value })}
+                />
+                <div className="modal-actions">
+                  <button className="btn-primary" onClick={handleEditarRental}>Guardar cambios</button>
+                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                </div>
+              </>
+            )}
+
+            {/* RENOVAR */}
             {modalType === "renovar" && (
               <>
                 <h3>Renovar cuenta</h3>
-                <p className="modal-subtitle">{selectedRental?.plataforma} — vence {selectedRental && new Date(selectedRental.fecha_fin).toLocaleDateString("es-CO")}</p>
+                <p className="modal-subtitle">
+                  {selectedRental?.plataforma}
+                  {selectedRental?.correo && <> — <span style={{ color: "#a5b4fc" }}>{selectedRental.correo}</span></>}
+                  {" "}— vence{" "}
+                  {selectedRental && new Date(selectedRental.fecha_fin).toLocaleDateString("es-CO")}
+                </p>
                 <label>Días a extender</label>
                 <div className="dias-quick">
                   {[7, 15, 30, 60].map((d) => (
-                    <button key={d} className={`dias-btn ${formDias === String(d) ? "active" : ""}`} onClick={() => setFormDias(String(d))}>{d}d</button>
+                    <button
+                      key={d}
+                      className={`dias-btn ${formDias === String(d) ? "active" : ""}`}
+                      onClick={() => setFormDias(String(d))}
+                    >{d}d</button>
                   ))}
                 </div>
-                <input type="number" value={formDias} onChange={(e) => setFormDias(e.target.value)} min="1" />
+                <input
+                  type="number"
+                  value={formDias}
+                  onChange={(e) => setFormDias(e.target.value)}
+                  min="1"
+                />
                 {selectedRental && formDias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
-                    📅 Nueva fecha fin: {new Date(addDays(selectedRental.fecha_fin, parseInt(formDias) || 0)).toLocaleDateString("es-CO")}
+                    📅 Nueva fecha fin:{" "}
+                    {new Date(
+                      addDays(selectedRental.fecha_fin, parseInt(formDias) || 0)
+                    ).toLocaleDateString("es-CO")}
                   </p>
                 )}
                 <div className="modal-actions">
@@ -517,26 +914,49 @@ function Rentals() {
               </>
             )}
 
+            {/* PAGO */}
             {modalType === "pago" && (
               <>
                 <h3>Registrar Pago</h3>
-                <p className="modal-subtitle">{selectedRental?.plataforma}</p>
-                <input type="number" placeholder="Monto (COP) *" value={formPago.monto} onChange={(e) => setFormPago({ ...formPago, monto: e.target.value })} />
+                <p className="modal-subtitle">
+                  {selectedRental?.plataforma}
+                  {selectedRental?.correo && <> — <span style={{ color: "#a5b4fc" }}>{selectedRental.correo}</span></>}
+                </p>
+                <input
+                  type="number"
+                  placeholder="Monto (COP) *"
+                  value={formPago.monto}
+                  onChange={(e) => setFormPago({ ...formPago, monto: e.target.value })}
+                />
                 <label>Fecha de pago</label>
-                <input type="date" value={formPago.fecha_pago} onChange={(e) => setFormPago({ ...formPago, fecha_pago: e.target.value })} />
-                <select value={formPago.estado} onChange={(e) => setFormPago({ ...formPago, estado: e.target.value })}>
+                <input
+                  type="date"
+                  value={formPago.fecha_pago}
+                  onChange={(e) => setFormPago({ ...formPago, fecha_pago: e.target.value })}
+                />
+                <select
+                  value={formPago.estado}
+                  onChange={(e) => setFormPago({ ...formPago, estado: e.target.value })}
+                >
                   <option value="pagado">Pagado</option>
                   <option value="pendiente">Pendiente</option>
                   <option value="vencido">Vencido</option>
                 </select>
-                <select value={formPago.metodo} onChange={(e) => setFormPago({ ...formPago, metodo: e.target.value })}>
+                <select
+                  value={formPago.metodo}
+                  onChange={(e) => setFormPago({ ...formPago, metodo: e.target.value })}
+                >
                   <option value="efectivo">Efectivo</option>
                   <option value="transferencia">Transferencia</option>
                   <option value="nequi">Nequi</option>
                   <option value="daviplata">Daviplata</option>
                   <option value="otro">Otro</option>
                 </select>
-                <textarea placeholder="Notas (opcional)" value={formPago.notas} onChange={(e) => setFormPago({ ...formPago, notas: e.target.value })} />
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formPago.notas}
+                  onChange={(e) => setFormPago({ ...formPago, notas: e.target.value })}
+                />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRegistrarPago}>Registrar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -544,15 +964,35 @@ function Rentals() {
               </>
             )}
 
+            {/* GARANTÍA */}
             {modalType === "garantia" && (
               <>
                 <h3>Registrar Garantía</h3>
-                <p className="modal-subtitle">{selectedRental?.plataforma}</p>
+                <p className="modal-subtitle">
+                  {selectedRental?.plataforma}
+                  {selectedRental?.correo && <> — <span style={{ color: "#a5b4fc" }}>{selectedRental.correo}</span></>}
+                </p>
                 <label>Fecha de reporte</label>
-                <input type="date" value={formGarantia.fecha_reporte} onChange={(e) => setFormGarantia({ ...formGarantia, fecha_reporte: e.target.value })} />
-                <textarea placeholder="Descripción del problema *" value={formGarantia.descripcion} onChange={(e) => setFormGarantia({ ...formGarantia, descripcion: e.target.value })} />
-                <input placeholder="Cuenta de reemplazo (opcional)" value={formGarantia.cuenta_reemplazo} onChange={(e) => setFormGarantia({ ...formGarantia, cuenta_reemplazo: e.target.value })} />
-                <textarea placeholder="Notas (opcional)" value={formGarantia.notas} onChange={(e) => setFormGarantia({ ...formGarantia, notas: e.target.value })} />
+                <input
+                  type="date"
+                  value={formGarantia.fecha_reporte}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, fecha_reporte: e.target.value })}
+                />
+                <textarea
+                  placeholder="Descripción del problema *"
+                  value={formGarantia.descripcion}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, descripcion: e.target.value })}
+                />
+                <input
+                  placeholder="Cuenta de reemplazo (opcional)"
+                  value={formGarantia.cuenta_reemplazo}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, cuenta_reemplazo: e.target.value })}
+                />
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formGarantia.notas}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, notas: e.target.value })}
+                />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRegistrarGarantia}>Registrar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -560,12 +1000,21 @@ function Rentals() {
               </>
             )}
 
+            {/* RESOLVER */}
             {modalType === "resolver" && (
               <>
                 <h3>Resolver Garantía</h3>
                 <p className="modal-subtitle">{modalData?.descripcion}</p>
-                <input placeholder="Cuenta de reemplazo suministrada" value={formResolver.cuenta_reemplazo} onChange={(e) => setFormResolver({ ...formResolver, cuenta_reemplazo: e.target.value })} />
-                <textarea placeholder="Notas de resolución" value={formResolver.notas} onChange={(e) => setFormResolver({ ...formResolver, notas: e.target.value })} />
+                <input
+                  placeholder="Cuenta de reemplazo suministrada"
+                  value={formResolver.cuenta_reemplazo}
+                  onChange={(e) => setFormResolver({ ...formResolver, cuenta_reemplazo: e.target.value })}
+                />
+                <textarea
+                  placeholder="Notas de resolución"
+                  value={formResolver.notas}
+                  onChange={(e) => setFormResolver({ ...formResolver, notas: e.target.value })}
+                />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleResolverGarantia}>Resolver</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -573,16 +1022,22 @@ function Rentals() {
               </>
             )}
 
+            {/* DELETE */}
             {modalType === "delete" && (
               <>
                 <h3>¿Eliminar alquiler?</h3>
-                <p className="modal-subtitle">Se eliminará {selectedRental?.plataforma} y todos sus pagos y garantías. Esta acción no se puede deshacer.</p>
+                <p className="modal-subtitle">
+                  Se eliminará {selectedRental?.plataforma}
+                  {selectedRental?.correo && ` (${selectedRental.correo})`} y todos sus pagos y garantías.
+                  Esta acción no se puede deshacer.
+                </p>
                 <div className="modal-actions">
                   <button className="btn-danger" onClick={handleDeleteRental}>Eliminar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
             )}
+
           </div>
         </div>
       )}
