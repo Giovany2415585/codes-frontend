@@ -725,3 +725,119 @@
     width: 95%;
   }
 }
+/* ── NUEVOS ESTILOS ── */
+
+.emails-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.btn-danger-small {
+  padding: 5px 10px;
+  font-size: 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-danger-small:hover { background: rgba(239,68,68,0.25); }
+
+.select-all-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.selected-count { font-size: 11px; color: #a5b4fc; }
+.email-checkbox { cursor: pointer; accent-color: #6c63ff; }
+
+.subjects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.btn-toggle-saved {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(99,102,241,0.3);
+  background: rgba(99,102,241,0.1);
+  color: #a5b4fc;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-toggle-saved:hover { background: rgba(99,102,241,0.2); }
+
+.saved-subjects-panel {
+  background: rgba(99,102,241,0.05);
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.saved-subjects-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.saved-subjects-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.saved-subject-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(99,102,241,0.15);
+  border: 1px solid rgba(99,102,241,0.2);
+  font-size: 12px;
+}
+
+.saved-subject-chip span:hover { color: #a5b4fc; }
+.saved-subject-chip.dangerous { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); }
+.empty-saved { font-size: 12px; color: rgba(255,255,255,0.3); margin: 0; }
+
+.dangerous-section {
+  padding: 15px 25px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.dangerous-panel {
+  background: rgba(239,68,68,0.04);
+  border: 1px solid rgba(239,68,68,0.12);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.dangerous-desc { font-size: 12px; color: rgba(255,255,255,0.4); margin: 0 0 10px; }
+
+.bulk-subject-form {
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 10px;
+  padding: 12px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bulk-subject-label { margin: 0; font-size: 12px; color: #a5b4fc; }
