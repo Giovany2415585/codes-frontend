@@ -400,3 +400,8 @@
   border-color: rgba(99,102,241,0.4);
   color: #a5b4fc;
 }
+
+.filter-select option {
+  background: #1e293b;
+  color: #f1f5f9;
+}
