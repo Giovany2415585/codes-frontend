@@ -27,6 +27,7 @@ interface User {
 
 interface Pago {
   id: number;
+  alquiler_id: number;
   monto: number;
   fecha_pago: string;
   estado: string;
@@ -36,18 +37,12 @@ interface Pago {
 
 interface Garantia {
   id: number;
+  alquiler_id: number;
   fecha_reporte: string;
   descripcion: string;
   cuenta_reemplazo: string;
   estado: "pendiente" | "resuelta";
   notas: string;
-}
-
-interface ClientGroup {
-  user_id: number;
-  cliente_nombre: string;
-  cliente_email: string;
-  rentals: Rental[];
 }
 
 const PLATAFORMAS = [
@@ -64,23 +59,25 @@ function addDays(dateStr: string, days: number): string {
 function Rentals() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [selectedClient, setSelectedClient] = useState<ClientGroup | null>(null);
+  const [selectedClient, setSelectedClient] = useState<number | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [garantias, setGarantias] = useState<Garantia[]>([]);
   const [activeTab, setActiveTab] = useState<"cuentas" | "pagos" | "garantias">("cuentas");
-
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "crear" | "renovar" | "pago" | "garantia" | "resolver" | "delete" | "editar" | null
+    "crear" | "editar" | "renovar" | "pago" | "garantia" | "resolver" | "delete" | null
   >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
-
   const [filterEstado, setFilterEstado] = useState("todos");
   const [searchText, setSearchText] = useState("");
 
-  // Correos autorizados del cliente seleccionado en el formulario crear/editar
-  const [correosCliente, setCorreosCliente] = useState<string[]>([]);
+  // Correos disponibles para dropdown al seleccionar cliente
+  const [correosDisponibles, setCorreosDisponibles] = useState<string[]>([]);
+
+  // Bulk correos para crear múltiples alquileres
+  const [bulkInput, setBulkInput] = useState("");
+  const [bulkCorreos, setBulkCorreos] = useState<string[]>([]);
 
   const [formRental, setFormRental] = useState({
     user_id: "",
@@ -97,11 +94,11 @@ function Rentals() {
     correo: "",
     fecha_inicio: "",
     dias: "30",
+    fecha_fin: "",
     precio: "",
     estado: "activo",
     notas: "",
   });
-  const [correosEditar, setCorreosEditar] = useState<string[]>([]);
 
   const [formDias, setFormDias] = useState("30");
   const [formPago, setFormPago] = useState({
@@ -142,74 +139,67 @@ function Rentals() {
     }
   };
 
-  const loadCorreosCliente = async (user_id: string | number, setter: (emails: string[]) => void) => {
-    if (!user_id) { setter([]); return; }
+  const parseBulkCorreos = (input: string) => {
+    const parsed = input
+      .split(";")
+      .map((c) => c.trim().toLowerCase())
+      .filter((c) => c.length > 0 && c.includes("@"));
+    const unique = [...new Set(parsed)];
+    setBulkCorreos(unique);
+  };
+
+  const removeBulkCorreo = (correo: string) => {
+    setBulkCorreos((prev) => prev.filter((c) => c !== correo));
+  };
+
+  const loadCorreos = async (userId: string) => {
+    if (!userId) { setCorreosDisponibles([]); return; }
     try {
-      const data = await apiFetch(`/api/alquileres/correos-usuario/${user_id}`);
-      setter(data);
+      const data = await apiFetch(`/api/alquileres/usuario/${userId}/correos`);
+      setCorreosDisponibles(data);
     } catch {
-      setter([]);
+      setCorreosDisponibles([]);
     }
   };
 
-  // ─── Agrupado por cliente ──────────────────────────────────────────────────
-  const clientGroups: ClientGroup[] = [];
-  rentals.forEach((r) => {
-    const existing = clientGroups.find((g) => g.user_id === r.user_id);
-    if (existing) {
-      existing.rentals.push(r);
-    } else {
-      clientGroups.push({
-        user_id: r.user_id,
-        cliente_nombre: r.cliente_nombre,
-        cliente_email: r.cliente_email,
-        rentals: [r],
-      });
-    }
-  });
+  // Ordenar alquileres por fecha_fin ASC (más próximo primero)
+  const sortedRentals = [...rentals].sort((a, b) =>
+    new Date(a.fecha_fin).getTime() - new Date(b.fecha_fin).getTime()
+  );
 
-  // Ordenar grupos por fecha de vencimiento más próxima
-  const sortedGroups = [...clientGroups].sort((a, b) => {
-    const minA = Math.min(...a.rentals.map((r) => r.dias_restantes));
-    const minB = Math.min(...b.rentals.map((r) => r.dias_restantes));
-    return minA - minB;
-  });
-
-  const filteredGroups = sortedGroups.filter((g) => {
+  // Aplanar: una fila por alquiler, no agrupado
+  const flatRows = sortedRentals.filter((r) => {
     const matchSearch =
-      g.cliente_nombre?.toLowerCase().includes(searchText.toLowerCase()) ||
-      g.cliente_email?.toLowerCase().includes(searchText.toLowerCase());
+      r.cliente_nombre?.toLowerCase().includes(searchText.toLowerCase()) ||
+      r.cliente_email?.toLowerCase().includes(searchText.toLowerCase()) ||
+      r.plataforma?.toLowerCase().includes(searchText.toLowerCase()) ||
+      (r.correo || "").toLowerCase().includes(searchText.toLowerCase());
     const matchEstado =
       filterEstado === "todos" ||
-      g.rentals.some((r) =>
-        filterEstado === "vencer"
-          ? r.dias_restantes >= 0 && r.dias_restantes <= 3
-          : r.estado === filterEstado
-      );
+      (filterEstado === "vencer" ? r.dias_restantes >= 0 && r.dias_restantes <= 3 : r.estado === filterEstado);
     return matchSearch && matchEstado;
   });
 
-  const getGroupStatus = (group: ClientGroup) => {
-    const minDias = Math.min(...group.rentals.map((r) => r.dias_restantes));
-    if (minDias < 0) return "vencido";
-    if (minDias <= 3) return "vencer";
-    return "activo";
-  };
+  // Alquileres del cliente seleccionado (para el panel de detalle)
+  const clientRentals = selectedClient
+    ? sortedRentals.filter((r) => r.user_id === selectedClient)
+    : [];
 
-  const getMinVence = (group: ClientGroup) => {
-    return group.rentals.reduce((a, b) => (a.dias_restantes < b.dias_restantes ? a : b));
-  };
+  const clientInfo = selectedClient
+    ? rentals.find((r) => r.user_id === selectedClient)
+    : null;
 
-  const handleSelectClient = async (group: ClientGroup) => {
-    if (selectedClient?.user_id === group.user_id) {
+  const handleSelectClient = async (userId: number) => {
+    if (selectedClient === userId) {
       setSelectedClient(null);
       return;
     }
-    setSelectedClient(group);
+    setSelectedClient(userId);
     setActiveTab("cuentas");
+    const clientRentalsLocal = rentals.filter((r) => r.user_id === userId);
     const allPagos: Pago[] = [];
     const allGarantias: Garantia[] = [];
-    for (const r of group.rentals) {
+    for (const r of clientRentalsLocal) {
       try {
         const [p, g] = await Promise.all([
           apiFetch(`/api/alquileres/${r.id}/pagos`),
@@ -223,7 +213,23 @@ function Rentals() {
     setGarantias(allGarantias);
   };
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
+  const refreshClientDetail = async (userId: number) => {
+    const clientRentalsLocal = rentals.filter((r) => r.user_id === userId);
+    const allPagos: Pago[] = [];
+    const allGarantias: Garantia[] = [];
+    for (const r of clientRentalsLocal) {
+      try {
+        const [p, g] = await Promise.all([
+          apiFetch(`/api/alquileres/${r.id}/pagos`),
+          apiFetch(`/api/alquileres/${r.id}/garantias`),
+        ]);
+        allPagos.push(...p);
+        allGarantias.push(...g);
+      } catch {}
+    }
+    setPagos(allPagos);
+    setGarantias(allGarantias);
+  };
 
   const handleCreateRental = async () => {
     if (!formRental.user_id || !formRental.plataforma || !formRental.fecha_inicio || !formRental.dias) {
@@ -231,27 +237,34 @@ function Rentals() {
       return;
     }
     const fecha_fin = addDays(formRental.fecha_inicio, parseInt(formRental.dias));
+    const correosParaCrear = bulkCorreos.length > 0 ? bulkCorreos : [formRental.correo || null];
+
     try {
-      await apiFetch("/api/alquileres", {
-        method: "POST",
-        body: JSON.stringify({
-          user_id: parseInt(formRental.user_id),
-          plataforma: formRental.plataforma,
-          correo: formRental.correo || null,
-          fecha_inicio: formRental.fecha_inicio,
-          fecha_fin,
-          precio: parseFloat(formRental.precio) || 0,
-          notas: formRental.notas,
-        }),
-      });
-      toast.success("Alquiler creado");
+      for (const correo of correosParaCrear) {
+        await apiFetch("/api/alquileres", {
+          method: "POST",
+          body: JSON.stringify({
+            user_id: parseInt(formRental.user_id),
+            plataforma: formRental.plataforma,
+            correo: correo || null,
+            fecha_inicio: formRental.fecha_inicio,
+            fecha_fin,
+            precio: parseFloat(formRental.precio) || 0,
+            notas: formRental.notas,
+          }),
+        });
+      }
+      const total = correosParaCrear.length;
+      toast.success(total > 1 ? `${total} alquileres creados` : "Alquiler creado");
       setShowModal(false);
       setFormRental({
         user_id: "", plataforma: "", correo: "",
         fecha_inicio: new Date().toISOString().split("T")[0],
         dias: "30", precio: "", notas: "",
       });
-      setCorreosCliente([]);
+      setBulkInput("");
+      setBulkCorreos([]);
+      setCorreosDisponibles([]);
       loadRentals();
     } catch (err: any) {
       toast.error(err.message || "Error creando alquiler");
@@ -260,8 +273,8 @@ function Rentals() {
 
   const handleEditarRental = async () => {
     if (!selectedRental) return;
-    const fecha_fin = addDays(formEditar.fecha_inicio, parseInt(formEditar.dias));
     try {
+      const fecha_fin = addDays(formEditar.fecha_inicio, parseInt(formEditar.dias));
       await apiFetch(`/api/alquileres/${selectedRental.id}`, {
         method: "PUT",
         body: JSON.stringify({
@@ -276,10 +289,8 @@ function Rentals() {
       });
       toast.success("Alquiler actualizado");
       setShowModal(false);
-      loadRentals();
-      if (selectedClient) {
-        setTimeout(() => handleSelectClient(selectedClient), 300);
-      }
+      await loadRentals();
+      if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error actualizando alquiler");
     }
@@ -295,9 +306,6 @@ function Rentals() {
       toast.success(`Renovado por ${formDias} días`);
       setShowModal(false);
       loadRentals();
-      if (selectedClient) {
-        setTimeout(() => handleSelectClient(selectedClient), 300);
-      }
     } catch (err: any) {
       toast.error(err.message || "Error renovando");
     }
@@ -312,7 +320,7 @@ function Rentals() {
       });
       toast.success("Pago registrado");
       setShowModal(false);
-      if (selectedClient) handleSelectClient(selectedClient);
+      if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error registrando pago");
     }
@@ -327,7 +335,7 @@ function Rentals() {
       });
       toast.success("Garantía registrada");
       setShowModal(false);
-      if (selectedClient) handleSelectClient(selectedClient);
+      if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error registrando garantía");
     }
@@ -342,7 +350,7 @@ function Rentals() {
       });
       toast.success("Garantía resuelta");
       setShowModal(false);
-      if (selectedClient) handleSelectClient(selectedClient);
+      if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error resolviendo garantía");
     }
@@ -354,8 +362,12 @@ function Rentals() {
       await apiFetch(`/api/alquileres/${selectedRental.id}`, { method: "DELETE" });
       toast.success("Alquiler eliminado");
       setShowModal(false);
-      setSelectedClient(null);
-      loadRentals();
+      await loadRentals();
+      // Si el cliente ya no tiene más alquileres, cerrar panel
+      const remaining = rentals.filter(
+        (r) => r.user_id === selectedClient && r.id !== selectedRental.id
+      );
+      if (remaining.length === 0) setSelectedClient(null);
     } catch {
       toast.error("Error eliminando alquiler");
     }
@@ -367,7 +379,7 @@ function Rentals() {
     setModalData(data || null);
 
     if (type === "editar" && rental) {
-      const diasCalc = Math.round(
+      const dias = Math.round(
         (new Date(rental.fecha_fin).getTime() - new Date(rental.fecha_inicio).getTime()) /
         (1000 * 60 * 60 * 24)
       );
@@ -375,26 +387,20 @@ function Rentals() {
         plataforma: rental.plataforma,
         correo: rental.correo || "",
         fecha_inicio: rental.fecha_inicio.split("T")[0],
-        dias: String(diasCalc > 0 ? diasCalc : 30),
-        precio: String(rental.precio || ""),
+        dias: String(dias),
+        fecha_fin: rental.fecha_fin.split("T")[0],
+        precio: String(rental.precio),
         estado: rental.estado,
         notas: rental.notas || "",
       });
-      loadCorreosCliente(rental.user_id, setCorreosEditar);
+      // Cargar correos del cliente para el dropdown de edición
+      loadCorreos(String(rental.user_id));
     }
 
-    if (type === "renovar") {
-      setFormDias("30");
-    }
-    if (type === "pago") {
-      setFormPago({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
-    }
-    if (type === "garantia") {
-      setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
-    }
-    if (type === "resolver") {
-      setFormResolver({ cuenta_reemplazo: "", notas: "" });
-    }
+    if (type === "renovar") setFormDias("30");
+    if (type === "pago") setFormPago({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+    if (type === "garantia") setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
+    if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
     setShowModal(true);
   };
@@ -412,7 +418,6 @@ function Rentals() {
 
   return (
     <div className="rentals-container">
-      {/* ─── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="rentals-header">
         <div className="rentals-header-left">
           <h2>Alquileres</h2>
@@ -425,13 +430,15 @@ function Rentals() {
         <button
           className="btn-primary"
           onClick={() => {
+            setModalType("crear");
             setFormRental({
               user_id: "", plataforma: "", correo: "",
               fecha_inicio: new Date().toISOString().split("T")[0],
               dias: "30", precio: "", notas: "",
             });
-            setCorreosCliente([]);
-            setModalType("crear");
+            setBulkInput("");
+            setBulkCorreos([]);
+            setCorreosDisponibles([]);
             setShowModal(true);
           }}
         >
@@ -439,11 +446,10 @@ function Rentals() {
         </button>
       </div>
 
-      {/* ─── FILTROS ─────────────────────────────────────────────────────────── */}
       <div className="rentals-filters">
         <input
           type="text"
-          placeholder="Buscar cliente..."
+          placeholder="Buscar cliente, plataforma o correo..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           className="filter-input"
@@ -457,57 +463,71 @@ function Rentals() {
         </select>
       </div>
 
-      {/* ─── TABLA ──────────────────────────────────────────────────────────── */}
       <div className="rentals-card">
         <div className="rentals-table-wrap">
           <table className="rentals-table">
             <thead>
               <tr>
                 <th>Cliente</th>
-                <th>Cuentas</th>
-                <th>Próx. vence</th>
+                <th>Plataforma</th>
+                <th>Correo cuenta</th>
+                <th>Vence</th>
                 <th>Estado</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {filteredGroups.map((group) => {
-                const status = getGroupStatus(group);
-                const minVence = getMinVence(group);
+              {flatRows.map((r) => {
                 const initials =
-                  group.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
+                  r.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
+                const isSelected = selectedClient === r.user_id;
                 return (
                   <tr
-                    key={group.user_id}
-                    className={`rental-row ${selectedClient?.user_id === group.user_id ? "selected" : ""}`}
-                    onClick={() => handleSelectClient(group)}
+                    key={r.id}
+                    className={`rental-row ${isSelected ? "selected" : ""} ${r.dias_restantes <= 3 && r.dias_restantes >= 0 ? "row-urgent" : ""}`}
+                    onClick={() => handleSelectClient(r.user_id)}
                   >
                     <td>
                       <div className="client-cell">
                         <div className="client-avatar">{initials}</div>
                         <div>
-                          <span className="client-name">{group.cliente_nombre}</span>
-                          <span className="client-email">{group.cliente_email}</span>
+                          <span className="client-name">{r.cliente_nombre}</span>
+                          <span className="client-email">{r.cliente_email}</span>
                         </div>
                       </div>
                     </td>
-                    <td>{group.rentals.length} cuenta{group.rentals.length > 1 ? "s" : ""}</td>
+                    <td>
+                      <span className="plataforma-badge">{r.plataforma}</span>
+                    </td>
+                    <td>
+                      {r.correo ? (
+                        <span className="correo-cuenta">{r.correo}</span>
+                      ) : (
+                        <span className="correo-vacio">—</span>
+                      )}
+                    </td>
                     <td>
                       <div>
                         <span style={{ fontSize: "0.8rem" }}>
-                          {new Date(minVence.fecha_fin).toLocaleDateString("es-CO")}
+                          {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
                         </span>
                         <br />
-                        <span className={`dias-badge ${getDiasColor(minVence.dias_restantes)}`}>
-                          {minVence.dias_restantes < 0
-                            ? `${Math.abs(minVence.dias_restantes)}d vencido`
-                            : `${minVence.dias_restantes}d`}
+                        <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
+                          {r.dias_restantes < 0
+                            ? `${Math.abs(r.dias_restantes)}d vencido`
+                            : `${r.dias_restantes}d`}
                         </span>
                       </div>
                     </td>
                     <td>
-                      <span className={`estado-badge ${status === "vencer" ? "urgente" : status}`}>
-                        {status === "vencer" ? "por vencer" : status}
+                      <span
+                        className={`estado-badge ${
+                          r.dias_restantes >= 0 && r.dias_restantes <= 3 ? "urgente" : r.estado
+                        }`}
+                      >
+                        {r.dias_restantes >= 0 && r.dias_restantes <= 3
+                          ? "por vencer"
+                          : r.estado}
                       </span>
                     </td>
                     <td style={{ textAlign: "right", fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>
@@ -516,26 +536,36 @@ function Rentals() {
                   </tr>
                 );
               })}
-              {filteredGroups.length === 0 && (
+              {flatRows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="empty-row">No hay clientes con alquileres</td>
+                  <td colSpan={6} className="empty-row">
+                    No hay alquileres
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* ─── DETALLE CLIENTE ─────────────────────────────────────────────── */}
-        {selectedClient && (
+        {/* ─── PANEL DE DETALLE DEL CLIENTE ─── */}
+        {selectedClient && clientInfo && (
           <div className="rental-detail">
             <div className="detail-header">
-              <h3>👤 {selectedClient.cliente_nombre}</h3>
+              <div className="detail-header-info">
+                <h3>
+                  <span className="client-avatar-sm">
+                    {clientInfo.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2)}
+                  </span>
+                  {clientInfo.cliente_nombre}
+                </h3>
+                <span className="detail-email">{clientInfo.cliente_email}</span>
+              </div>
               <div className="detail-tabs">
                 <button
                   className={activeTab === "cuentas" ? "active" : ""}
                   onClick={() => setActiveTab("cuentas")}
                 >
-                  📦 Cuentas ({selectedClient.rentals.length})
+                  📦 Cuentas ({clientRentals.length})
                 </button>
                 <button
                   className={activeTab === "pagos" ? "active" : ""}
@@ -552,79 +582,86 @@ function Rentals() {
               </div>
             </div>
 
-            {/* Tab: Cuentas */}
+            {/* TAB CUENTAS */}
             {activeTab === "cuentas" && (
               <div className="detail-list">
-                {selectedClient.rentals
-                  .slice()
-                  .sort((a, b) => a.dias_restantes - b.dias_restantes)
-                  .map((r) => (
-                    <div
-                      key={r.id}
-                      className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""}`}
-                    >
-                      <div className="cuenta-info">
-                        <span className="plataforma-badge">{r.plataforma}</span>
-                        {r.correo && (
-                          <span className="cuenta-correo">{r.correo}</span>
-                        )}
+                {clientRentals.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""}`}
+                  >
+                    <div className="cuenta-info">
+                      <span className="plataforma-badge">{r.plataforma}</span>
+                      {r.correo && (
+                        <span className="correo-cuenta-detail">📧 {r.correo}</span>
+                      )}
+                      <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+                        {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} →{" "}
+                        {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
+                      </span>
+                      <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
+                        {r.dias_restantes < 0
+                          ? `${Math.abs(r.dias_restantes)}d vencido`
+                          : `${r.dias_restantes}d restantes`}
+                      </span>
+                      <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>
+                        {r.pago_estado || "sin pago"}
+                      </span>
+                      {r.precio > 0 && (
                         <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                          {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} →{" "}
-                          {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
+                          ${Number(r.precio).toLocaleString("es-CO")}
                         </span>
-                        <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
-                          {r.dias_restantes < 0
-                            ? `${Math.abs(r.dias_restantes)}d vencido`
-                            : `${r.dias_restantes}d restantes`}
-                        </span>
-                        <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>
-                          {r.pago_estado || "sin pago"}
-                        </span>
-                        {r.precio > 0 && (
-                          <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                            ${Number(r.precio).toLocaleString("es-CO")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="cuenta-actions">
-                        <button
-                          className="btn-icon editar"
-                          title="Editar"
-                          onClick={() => openModal("editar", r)}
-                        >✏️</button>
-                        <button
-                          className="btn-icon renovar"
-                          title="Renovar"
-                          onClick={() => openModal("renovar", r)}
-                        >↻</button>
-                        <button
-                          className="btn-icon pago"
-                          title="Pago"
-                          onClick={() => openModal("pago", r)}
-                        >💳</button>
-                        <button
-                          className="btn-icon garantia"
-                          title="Garantía"
-                          onClick={() => openModal("garantia", r)}
-                        >🛡️</button>
-                        <button
-                          className="btn-icon delete"
-                          title="Eliminar"
-                          onClick={() => openModal("delete", r)}
-                        >✕</button>
-                      </div>
+                      )}
                     </div>
-                  ))}
+                    <div className="cuenta-actions">
+                      <button
+                        className="btn-icon editar"
+                        title="Editar"
+                        onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="btn-icon renovar"
+                        title="Renovar"
+                        onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}
+                      >
+                        ↻
+                      </button>
+                      <button
+                        className="btn-icon pago"
+                        title="Pago"
+                        onClick={(e) => { e.stopPropagation(); openModal("pago", r); }}
+                      >
+                        💳
+                      </button>
+                      <button
+                        className="btn-icon garantia"
+                        title="Garantía"
+                        onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}
+                      >
+                        🛡️
+                      </button>
+                      <button
+                        className="btn-icon delete"
+                        title="Eliminar"
+                        onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
                 <button
                   className="btn-agregar-cuenta"
                   onClick={() => {
                     setFormRental({
-                      user_id: String(selectedClient.user_id),
+                      user_id: String(selectedClient),
                       plataforma: "", correo: "",
                       fecha_inicio: new Date().toISOString().split("T")[0],
                       dias: "30", precio: "", notas: "",
                     });
-                    loadCorreosCliente(selectedClient.user_id, setCorreosCliente);
+                    loadCorreos(String(selectedClient));
                     setModalType("crear");
                     setShowModal(true);
                   }}
@@ -634,58 +671,72 @@ function Rentals() {
               </div>
             )}
 
-            {/* Tab: Pagos */}
+            {/* TAB PAGOS */}
             {activeTab === "pagos" && (
               <div className="detail-list">
                 {pagos.length === 0 && <p className="empty-msg">Sin pagos registrados</p>}
-                {pagos.map((p, i) => (
-                  <div key={i} className="detail-item">
-                    <span className={`pago-badge ${p.estado}`}>{p.estado}</span>
-                    <span>${Number(p.monto).toLocaleString("es-CO")}</span>
-                    <span style={{ fontSize: "0.8rem" }}>
-                      {new Date(p.fecha_pago).toLocaleDateString("es-CO")}
-                    </span>
-                    <span className="metodo-tag">{p.metodo}</span>
-                  </div>
-                ))}
+                {pagos.map((p, i) => {
+                  const rental = clientRentals.find((r) => r.id === p.alquiler_id);
+                  return (
+                    <div key={i} className="detail-item pago-item">
+                      <div className="pago-info">
+                        {rental && <span className="plataforma-badge">{rental.plataforma}</span>}
+                        {rental?.correo && <span className="correo-tag">{rental.correo}</span>}
+                        <span className={`pago-badge ${p.estado}`}>{p.estado}</span>
+                        <span className="pago-monto">${Number(p.monto).toLocaleString("es-CO")}</span>
+                        <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.4)" }}>
+                          {new Date(p.fecha_pago).toLocaleDateString("es-CO")}
+                        </span>
+                        <span className="metodo-tag">{p.metodo}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Tab: Garantías */}
+            {/* TAB GARANTÍAS */}
             {activeTab === "garantias" && (
               <div className="detail-list">
                 {garantias.length === 0 && <p className="empty-msg">Sin garantías registradas</p>}
-                {garantias.map((g, i) => (
-                  <div key={i} className="detail-item garantia-item">
-                    <div className="garantia-info">
-                      <span className={`garantia-estado ${g.estado}`}>{g.estado}</span>
-                      <span className="garantia-desc">{g.descripcion}</span>
-                      {g.cuenta_reemplazo && (
-                        <span className="garantia-reemplazo">→ {g.cuenta_reemplazo}</span>
+                {garantias.map((g, i) => {
+                  const rental = clientRentals.find((r) => r.id === g.alquiler_id);
+                  return (
+                    <div key={i} className="detail-item garantia-item">
+                      <div className="garantia-info">
+                        {rental && <span className="plataforma-badge">{rental.plataforma}</span>}
+                        {rental?.correo && (
+                          <span className="correo-tag">📧 {rental.correo}</span>
+                        )}
+                        <span className={`garantia-estado ${g.estado}`}>{g.estado}</span>
+                        <span className="garantia-desc">{g.descripcion}</span>
+                        {g.cuenta_reemplazo && (
+                          <span className="garantia-reemplazo">→ {g.cuenta_reemplazo}</span>
+                        )}
+                      </div>
+                      {g.estado === "pendiente" && (
+                        <button
+                          className="btn-resolver"
+                          onClick={() => openModal("resolver", undefined, g)}
+                        >
+                          Resolver
+                        </button>
                       )}
                     </div>
-                    {g.estado === "pendiente" && (
-                      <button
-                        className="btn-resolver"
-                        onClick={() => openModal("resolver", undefined, g)}
-                      >
-                        Resolver
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* ─── MODALES ────────────────────────────────────────────────────────── */}
+      {/* ─── MODALES ─── */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal rentals-modal" onClick={(e) => e.stopPropagation()}>
 
-            {/* CREAR */}
+            {/* MODAL CREAR */}
             {modalType === "crear" && (
               <>
                 <h3>Nuevo Alquiler</h3>
@@ -693,12 +744,14 @@ function Rentals() {
                   value={formRental.user_id}
                   onChange={(e) => {
                     setFormRental({ ...formRental, user_id: e.target.value, correo: "" });
-                    loadCorreosCliente(e.target.value, setCorreosCliente);
+                    loadCorreos(e.target.value);
                   }}
                 >
                   <option value="">Seleccionar cliente *</option>
                   {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.first_name} — {u.email}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.first_name} — {u.email}
+                    </option>
                   ))}
                 </select>
 
@@ -707,26 +760,10 @@ function Rentals() {
                   onChange={(e) => setFormRental({ ...formRental, plataforma: e.target.value })}
                 >
                   <option value="">Seleccionar plataforma *</option>
-                  {PLATAFORMAS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {PLATAFORMAS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
                 </select>
-
-                <label>Correo de la cuenta</label>
-                {correosCliente.length > 0 ? (
-                  <select
-                    value={formRental.correo}
-                    onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
-                  >
-                    <option value="">Sin correo asignado</option>
-                    {correosCliente.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="correo@ejemplo.com (opcional)"
-                    value={formRental.correo}
-                    onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
-                  />
-                )}
 
                 <label>Fecha inicio *</label>
                 <input
@@ -742,90 +779,162 @@ function Rentals() {
                       key={d}
                       className={`dias-btn ${formRental.dias === String(d) ? "active" : ""}`}
                       onClick={() => setFormRental({ ...formRental, dias: String(d) })}
-                    >{d}d</button>
+                    >
+                      {d}d
+                    </button>
                   ))}
                 </div>
                 <input
                   type="number"
-                  placeholder="Días"
+                  placeholder="O escribe los días manualmente (ej: 1, 6, 90...)"
                   value={formRental.dias}
                   onChange={(e) => setFormRental({ ...formRental, dias: e.target.value })}
                   min="1"
                 />
-                {formRental.fecha_inicio && formRental.dias && (
+
+                {formRental.fecha_inicio && formRental.dias && parseInt(formRental.dias) > 0 && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
                     📅 Vence:{" "}
                     {new Date(
-                      addDays(formRental.fecha_inicio, parseInt(formRental.dias) || 0)
-                    ).toLocaleDateString("es-CO")}
+                      addDays(formRental.fecha_inicio, parseInt(formRental.dias))
+                    ).toLocaleDateString("es-CO")}{" "}
+                    — <strong>{formRental.dias} días</strong>
                   </p>
                 )}
 
                 <input
                   type="number"
-                  placeholder="Precio (COP)"
+                  placeholder="Precio por cuenta (COP)"
                   value={formRental.precio}
                   onChange={(e) => setFormRental({ ...formRental, precio: e.target.value })}
                 />
+
+                <label>Organiza múltiples correos separados por <span style={{ color: "#a5b4fc", fontFamily: "monospace" }}>;</span></label>
+                <textarea
+                  rows={3}
+                  placeholder="correo1@gmail.com;correo2@gmail.com;correo3@gmail.com"
+                  value={bulkInput}
+                  onChange={(e) => {
+                    setBulkInput(e.target.value);
+                    parseBulkCorreos(e.target.value);
+                  }}
+                  style={{ fontFamily: "monospace", fontSize: "0.82rem" }}
+                />
+
+                {bulkCorreos.length > 0 && (
+                  <div className="bulk-preview">
+                    <div className="bulk-preview-header">
+                      <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)" }}>
+                        Cuentas detectadas
+                      </span>
+                      <span className="bulk-count">{bulkCorreos.length} cuenta{bulkCorreos.length > 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="bulk-list">
+                      {bulkCorreos.map((c) => (
+                        <div key={c} className="bulk-item">
+                          <span className="bulk-correo">{c}</span>
+                          <button className="bulk-remove" onClick={() => removeBulkCorreo(c)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>
+                      Se crearán {bulkCorreos.length} alquileres individuales — cada uno editable y con garantía propia
+                    </p>
+                  </div>
+                )}
+
+                {bulkCorreos.length === 0 && (
+                  <>
+                    <label>O selecciona un correo individual</label>
+                    {correosDisponibles.length > 0 ? (
+                      <select
+                        value={formRental.correo}
+                        onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
+                      >
+                        <option value="">Sin correo asignado</option>
+                        {correosDisponibles.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="correo@ejemplo.com (opcional)"
+                        value={formRental.correo}
+                        onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
+                      />
+                    )}
+                  </>
+                )}
+
                 <textarea
                   placeholder="Notas (opcional)"
                   value={formRental.notas}
                   onChange={(e) => setFormRental({ ...formRental, notas: e.target.value })}
                 />
+
                 <div className="modal-actions">
-                  <button className="btn-primary" onClick={handleCreateRental}>Crear</button>
+                  <button className="btn-primary" onClick={handleCreateRental}>
+                    {bulkCorreos.length > 1
+                      ? `Crear ${bulkCorreos.length} alquileres`
+                      : "Crear alquiler"}
+                  </button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
             )}
 
-            {/* EDITAR */}
+            {/* MODAL EDITAR */}
             {modalType === "editar" && selectedRental && (
               <>
-                <h3>✏️ Editar cuenta</h3>
-                <p className="modal-subtitle">{selectedRental.plataforma} — {selectedRental.cliente_nombre}</p>
-
-                <label>Plataforma</label>
+                <h3>✏️ Editar Alquiler</h3>
+                <p className="modal-subtitle">
+                  {selectedRental.cliente_nombre} — ID #{selectedRental.id}
+                </p>
+                <label>Plataforma *</label>
                 <select
                   value={formEditar.plataforma}
                   onChange={(e) => setFormEditar({ ...formEditar, plataforma: e.target.value })}
                 >
-                  {PLATAFORMAS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  {PLATAFORMAS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
                 </select>
-
                 <label>Correo de la cuenta</label>
-                {correosEditar.length > 0 ? (
+                {correosDisponibles.length > 0 ? (
                   <select
                     value={formEditar.correo}
                     onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
                   >
                     <option value="">Sin correo asignado</option>
-                    {correosEditar.map((c) => <option key={c} value={c}>{c}</option>)}
+                    {correosDisponibles.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 ) : (
                   <input
                     type="text"
-                    placeholder="correo@ejemplo.com (opcional)"
+                    placeholder="Correo de la cuenta (opcional)"
                     value={formEditar.correo}
                     onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
                   />
                 )}
-
-                <label>Fecha inicio</label>
+                <label>Fecha inicio *</label>
                 <input
                   type="date"
                   value={formEditar.fecha_inicio}
                   onChange={(e) => setFormEditar({ ...formEditar, fecha_inicio: e.target.value })}
                 />
-
-                <label>Días asignados</label>
+                <label>Días asignados *</label>
                 <div className="dias-quick">
                   {[7, 15, 30, 60].map((d) => (
                     <button
                       key={d}
                       className={`dias-btn ${formEditar.dias === String(d) ? "active" : ""}`}
                       onClick={() => setFormEditar({ ...formEditar, dias: String(d) })}
-                    >{d}d</button>
+                    >
+                      {d}d
+                    </button>
                   ))}
                 </div>
                 <input
@@ -843,14 +952,12 @@ function Rentals() {
                     ).toLocaleDateString("es-CO")}
                   </p>
                 )}
-
                 <input
                   type="number"
                   placeholder="Precio (COP)"
                   value={formEditar.precio}
                   onChange={(e) => setFormEditar({ ...formEditar, precio: e.target.value })}
                 />
-
                 <label>Estado</label>
                 <select
                   value={formEditar.estado}
@@ -860,27 +967,26 @@ function Rentals() {
                   <option value="vencido">Vencido</option>
                   <option value="cancelado">Cancelado</option>
                 </select>
-
                 <textarea
                   placeholder="Notas (opcional)"
                   value={formEditar.notas}
                   onChange={(e) => setFormEditar({ ...formEditar, notas: e.target.value })}
                 />
                 <div className="modal-actions">
-                  <button className="btn-primary" onClick={handleEditarRental}>Guardar cambios</button>
+                  <button className="btn-primary" onClick={handleEditarRental}>Guardar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
             )}
 
-            {/* RENOVAR */}
+            {/* MODAL RENOVAR */}
             {modalType === "renovar" && (
               <>
                 <h3>Renovar cuenta</h3>
                 <p className="modal-subtitle">
                   {selectedRental?.plataforma}
-                  {selectedRental?.correo && <> — <span style={{ color: "#a5b4fc" }}>{selectedRental.correo}</span></>}
-                  {" "}— vence{" "}
+                  {selectedRental?.correo && ` — ${selectedRental.correo}`}
+                  {" — vence "}
                   {selectedRental && new Date(selectedRental.fecha_fin).toLocaleDateString("es-CO")}
                 </p>
                 <label>Días a extender</label>
@@ -890,7 +996,9 @@ function Rentals() {
                       key={d}
                       className={`dias-btn ${formDias === String(d) ? "active" : ""}`}
                       onClick={() => setFormDias(String(d))}
-                    >{d}d</button>
+                    >
+                      {d}d
+                    </button>
                   ))}
                 </div>
                 <input
@@ -914,13 +1022,13 @@ function Rentals() {
               </>
             )}
 
-            {/* PAGO */}
+            {/* MODAL PAGO */}
             {modalType === "pago" && (
               <>
                 <h3>Registrar Pago</h3>
                 <p className="modal-subtitle">
                   {selectedRental?.plataforma}
-                  {selectedRental?.correo && <> — <span style={{ color: "#a5b4fc" }}>{selectedRental.correo}</span></>}
+                  {selectedRental?.correo && ` — ${selectedRental.correo}`}
                 </p>
                 <input
                   type="number"
@@ -964,13 +1072,15 @@ function Rentals() {
               </>
             )}
 
-            {/* GARANTÍA */}
+            {/* MODAL GARANTÍA */}
             {modalType === "garantia" && (
               <>
                 <h3>Registrar Garantía</h3>
                 <p className="modal-subtitle">
                   {selectedRental?.plataforma}
-                  {selectedRental?.correo && <> — <span style={{ color: "#a5b4fc" }}>{selectedRental.correo}</span></>}
+                  {selectedRental?.correo && (
+                    <span style={{ color: "#a5b4fc" }}> — {selectedRental.correo}</span>
+                  )}
                 </p>
                 <label>Fecha de reporte</label>
                 <input
@@ -1000,7 +1110,7 @@ function Rentals() {
               </>
             )}
 
-            {/* RESOLVER */}
+            {/* MODAL RESOLVER GARANTÍA */}
             {modalType === "resolver" && (
               <>
                 <h3>Resolver Garantía</h3>
@@ -1022,14 +1132,14 @@ function Rentals() {
               </>
             )}
 
-            {/* DELETE */}
+            {/* MODAL DELETE */}
             {modalType === "delete" && (
               <>
                 <h3>¿Eliminar alquiler?</h3>
                 <p className="modal-subtitle">
                   Se eliminará {selectedRental?.plataforma}
-                  {selectedRental?.correo && ` (${selectedRental.correo})`} y todos sus pagos y garantías.
-                  Esta acción no se puede deshacer.
+                  {selectedRental?.correo && ` (${selectedRental.correo})`} y todos sus pagos y
+                  garantías. Esta acción no se puede deshacer.
                 </p>
                 <div className="modal-actions">
                   <button className="btn-danger" onClick={handleDeleteRental}>Eliminar</button>
@@ -1037,7 +1147,6 @@ function Rentals() {
                 </div>
               </>
             )}
-
           </div>
         </div>
       )}

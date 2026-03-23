@@ -47,7 +47,7 @@
   transition: border 0.2s;
 }
 
-.filter-input { min-width: 240px; }
+.filter-input { min-width: 260px; }
 .filter-input:focus, .filter-select:focus { border-color: rgba(99,102,241,0.6); }
 
 .rentals-card {
@@ -91,6 +91,7 @@
 .rental-row { cursor: pointer; transition: background 0.15s; }
 .rental-row:hover { background: rgba(255,255,255,0.03); }
 .rental-row.selected { background: rgba(99,102,241,0.08); }
+.rental-row.row-urgent { border-left: 3px solid rgba(239,68,68,0.5); }
 
 .empty-row {
   text-align: center;
@@ -114,8 +115,55 @@
   flex-shrink: 0;
 }
 
+.client-avatar-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
 .client-name { display: block; font-weight: 600; font-size: 0.875rem; }
 .client-email { display: block; font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+
+/* Correo de la cuenta en la tabla */
+.correo-cuenta {
+  font-size: 0.78rem;
+  color: #a5b4fc;
+  font-family: monospace;
+}
+
+.correo-vacio {
+  color: rgba(255,255,255,0.2);
+  font-size: 0.85rem;
+}
+
+/* Correo en el detalle de cuenta */
+.correo-cuenta-detail {
+  font-size: 0.78rem;
+  color: #a5b4fc;
+  background: rgba(99,102,241,0.1);
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: monospace;
+}
+
+/* Correo tag en pagos/garantías */
+.correo-tag {
+  font-size: 0.72rem;
+  color: rgba(165,180,252,0.7);
+  font-family: monospace;
+  background: rgba(99,102,241,0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
 
 .plataforma-badge {
   background: rgba(99,102,241,0.15);
@@ -125,18 +173,6 @@
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
-}
-
-/* Correo de la cuenta dentro del detalle */
-.cuenta-correo {
-  font-size: 0.78rem;
-  color: #67e8f9;
-  background: rgba(6,182,212,0.1);
-  border: 1px solid rgba(6,182,212,0.2);
-  border-radius: 5px;
-  padding: 1px 7px;
-  white-space: nowrap;
-  font-family: monospace;
 }
 
 .dias-badge {
@@ -177,6 +213,8 @@
 .estado-badge.vencido { background: rgba(239,68,68,0.15); color: #f87171; }
 .estado-badge.cancelado { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); }
 
+/* ─── DETALLE CLIENTE ─── */
+
 .rental-detail {
   border-top: 1px solid rgba(255,255,255,0.08);
   padding: 16px;
@@ -184,14 +222,32 @@
 
 .detail-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 14px;
 }
 
-.detail-header h3 { margin: 0; font-size: 1rem; color: var(--text-primary, #f1f5f9); }
+.detail-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-header-info h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary, #f1f5f9);
+  display: flex;
+  align-items: center;
+}
+
+.detail-email {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.4);
+  margin-left: 34px;
+}
 
 .detail-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -239,6 +295,32 @@
 
 .cuenta-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
+.pago-item { flex-wrap: wrap; gap: 8px; }
+.pago-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
+.pago-monto { font-weight: 600; color: #f1f5f9; font-size: 0.875rem; }
+
+/* Botón agregar cuenta */
+.btn-agregar-cuenta {
+  background: rgba(99,102,241,0.08);
+  border: 1px dashed rgba(99,102,241,0.3);
+  border-radius: 8px;
+  color: rgba(165,180,252,0.7);
+  padding: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: center;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.btn-agregar-cuenta:hover {
+  background: rgba(99,102,241,0.15);
+  border-color: rgba(99,102,241,0.5);
+  color: #a5b4fc;
+}
+
+/* ─── BOTONES ÍCONO ─── */
+
 .btn-icon {
   width: 28px;
   height: 28px;
@@ -252,10 +334,8 @@
   transition: background 0.15s;
 }
 
-/* Botón editar (nuevo) */
-.btn-icon.editar { background: rgba(14,165,233,0.12); color: #38bdf8; }
-.btn-icon.editar:hover { background: rgba(14,165,233,0.25); }
-
+.btn-icon.editar { background: rgba(148,163,184,0.12); color: #cbd5e1; }
+.btn-icon.editar:hover { background: rgba(148,163,184,0.25); }
 .btn-icon.renovar { background: rgba(99,102,241,0.15); color: #a5b4fc; }
 .btn-icon.renovar:hover { background: rgba(99,102,241,0.3); }
 .btn-icon.pago { background: rgba(34,197,94,0.12); color: #4ade80; }
@@ -264,24 +344,6 @@
 .btn-icon.garantia:hover { background: rgba(251,191,36,0.25); }
 .btn-icon.delete { background: rgba(239,68,68,0.12); color: #f87171; }
 .btn-icon.delete:hover { background: rgba(239,68,68,0.25); }
-
-/* Botón agregar cuenta */
-.btn-agregar-cuenta {
-  align-self: flex-start;
-  background: rgba(99,102,241,0.08);
-  border: 1px dashed rgba(99,102,241,0.3);
-  border-radius: 8px;
-  color: #a5b4fc;
-  padding: 7px 16px;
-  cursor: pointer;
-  font-size: 0.82rem;
-  margin-top: 4px;
-  transition: all 0.15s;
-}
-.btn-agregar-cuenta:hover {
-  background: rgba(99,102,241,0.18);
-  border-color: rgba(99,102,241,0.5);
-}
 
 .metodo-tag {
   background: rgba(255,255,255,0.06);
@@ -318,6 +380,8 @@
   padding: 16px;
   margin: 0;
 }
+
+/* ─── BOTONES GENERALES ─── */
 
 .btn-primary {
   background: #6366f1;
@@ -358,6 +422,8 @@
 }
 
 .btn-danger:hover { background: rgba(239,68,68,0.35); }
+
+/* ─── MODAL ─── */
 
 .modal-overlay {
   position: fixed;
@@ -438,4 +504,70 @@
 .filter-select option {
   background: #1e293b;
   color: #f1f5f9;
+}
+
+/* ─── BULK CORREOS ─── */
+
+.bulk-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.bulk-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bulk-count {
+  font-size: 0.72rem;
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.bulk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.bulk-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+.bulk-correo {
+  font-size: 0.78rem;
+  color: #a5b4fc;
+  font-family: monospace;
+}
+
+.bulk-remove {
+  background: rgba(239,68,68,0.15);
+  border: none;
+  border-radius: 4px;
+  color: #f87171;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
