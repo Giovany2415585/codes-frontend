@@ -363,6 +363,7 @@
 
 .users-list {
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -870,6 +871,8 @@
   border: 1px solid rgba(108,99,255,0.25);
   transition: all 0.25s ease;
   cursor: pointer;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .email-row:hover {
