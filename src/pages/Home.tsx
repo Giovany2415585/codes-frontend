@@ -133,28 +133,32 @@ function Home() {
               <p>{t("home.supportText")}</p>
 
               <div className="contact-info">
-  <div>
-    <strong>Email:</strong> cinebox.pnet@gmail.com
-  </div>
-  <div className="contact-buttons">
-    
-      href="https://wa.me/573185651516"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="contact-btn whatsapp"
-    >
-      WhatsApp
-    </a>
-    
-      href="https://t.me/Cinebox_net"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="contact-btn telegram"
-    >
-      Telegram
-    </a>
-  </div>
-</div>
+                <div>
+                  <strong>Email:</strong> cinebox.pnet@gmail.com
+                </div>
+                <div className="contact-buttons">
+                  <a
+                    href="https://wa.me/573185651516"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="contact-btn whatsapp"
+                  >
+                    WhatsApp
+                  </a>
+                  <a
+                    href="https://t.me/Cinebox_net"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="contact-btn telegram"
+                  >
+                    Telegram
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="products-container">
         <h2 className="products-title">{t("home.platformsTitle")}</h2>
