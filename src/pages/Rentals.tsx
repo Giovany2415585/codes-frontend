@@ -80,6 +80,7 @@ function Rentals() {
   const [garantias, setGarantias] = useState<Garantia[]>([]);
   const [activeTab, setActiveTab] = useState<"cuentas" | "pagos" | "garantias">("cuentas");
   const [gruposAbiertos, setGruposAbiertos] = useState<string[]>([]);
+  const [gruposTablaAbiertos, setGruposTablaAbiertos] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
     "crear" | "editar" | "renovar" | "pago" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | null
@@ -616,72 +617,82 @@ function Rentals() {
               </tr>
             </thead>
             <tbody>
-              {flatRows.map((r) => {
-                const initials =
-                  r.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
-                const isSelected = selectedClient === r.user_id;
-                return (
-                  <tr
-                    key={r.id}
-                    className={`rental-row ${isSelected ? "selected" : ""} ${r.dias_restantes <= 3 && r.dias_restantes >= 0 ? "row-urgent" : ""}`}
-                    onClick={() => handleSelectClient(r.user_id)}
-                  >
-                    <td>
-                      <div className="client-cell">
-                        <div className="client-avatar">{initials}</div>
-                        <div>
-                          <span className="client-name">{r.cliente_nombre}</span>
-                          <span className="client-email">{r.cliente_email}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="plataforma-badge">{r.plataforma}</span>
-                    </td>
-                    <td>
-                      {r.correo ? (
-                        <span className="correo-cuenta">{r.correo}</span>
-                      ) : (
-                        <span className="correo-vacio">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <div>
-                        <span style={{ fontSize: "0.8rem" }}>
-                          {formatDate(r.fecha_fin)}
-                        </span>
-                        <br />
-                        <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
-                          {r.dias_restantes < 0
-                            ? `${Math.abs(r.dias_restantes)}d vencido`
-                            : `${r.dias_restantes}d`}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className={`estado-badge ${
-                          r.dias_restantes >= 0 && r.dias_restantes <= 3 ? "urgente" : r.estado
-                        }`}
-                      >
-                        {r.dias_restantes >= 0 && r.dias_restantes <= 3
-                          ? "por vencer"
-                          : r.estado}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: "right", fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>
-                      Ver ▶
-                    </td>
-                  </tr>
-                );
-              })}
-              {flatRows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="empty-row">
-                    No hay alquileres
-                  </td>
-                </tr>
-              )}
+              {(() => {
+                if (flatRows.length === 0) {
+                  return (
+                    <tr><td colSpan={6} className="empty-row">No hay alquileres</td></tr>
+                  );
+                }
+                // Agrupar por fecha_fin
+                const grupos: { [fecha: string]: Rental[] } = {};
+                flatRows.forEach((r) => {
+                  const key = r.fecha_fin.split("T")[0];
+                  if (!grupos[key]) grupos[key] = [];
+                  grupos[key].push(r);
+                });
+                return Object.entries(grupos)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .flatMap(([fecha, rows]) => {
+                    const isOpen = gruposTablaAbiertos.includes(fecha);
+                    const minDias = Math.min(...rows.map(r => r.dias_restantes));
+                    const colorFecha = minDias < 0 ? "vencido" : minDias <= 3 ? "urgente" : minDias <= 7 ? "proximo" : "ok";
+                    const toggleGrupo = () => setGruposTablaAbiertos(prev =>
+                      prev.includes(fecha) ? prev.filter(f => f !== fecha) : [...prev, fecha]
+                    );
+                    return [
+                      // Fila cabecera del grupo
+                      <tr key={`grupo-${fecha}`} className="grupo-fecha-row" onClick={toggleGrupo}>
+                        <td colSpan={6}>
+                          <div className="grupo-fecha-header">
+                            <span className="grupo-fecha-arrow">{isOpen ? "▼" : "▶"}</span>
+                            <span className="grupo-fecha-label">📅 {formatDate(fecha)}</span>
+                            <span className="grupo-fecha-count">{rows.length} cuenta{rows.length > 1 ? "s" : ""}</span>
+                            <span className={`dias-badge ${colorFecha}`} style={{ marginLeft: "auto" }}>
+                              {minDias < 0 ? `${Math.abs(minDias)}d vencido` : `${minDias}d`}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>,
+                      // Filas de cuentas (solo si está abierto)
+                      ...(isOpen ? rows.map((r) => {
+                        const initials = r.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
+                        const isSelected = selectedClient === r.user_id;
+                        return (
+                          <tr
+                            key={r.id}
+                            className={`rental-row ${isSelected ? "selected" : ""} ${r.dias_restantes <= 3 && r.dias_restantes >= 0 ? "row-urgent" : ""}`}
+                            onClick={() => handleSelectClient(r.user_id)}
+                          >
+                            <td>
+                              <div className="client-cell">
+                                <div className="client-avatar">{initials}</div>
+                                <div>
+                                  <span className="client-name">{r.cliente_nombre}</span>
+                                  <span className="client-email">{r.cliente_email}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td><span className="plataforma-badge">{r.plataforma}</span></td>
+                            <td>
+                              {r.correo ? <span className="correo-cuenta">{r.correo}</span> : <span className="correo-vacio">—</span>}
+                            </td>
+                            <td>
+                              <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
+                                {r.dias_restantes < 0 ? `${Math.abs(r.dias_restantes)}d vencido` : `${r.dias_restantes}d`}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`estado-badge ${r.dias_restantes >= 0 && r.dias_restantes <= 3 ? "urgente" : r.estado}`}>
+                                {r.dias_restantes >= 0 && r.dias_restantes <= 3 ? "por vencer" : r.estado}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: "right", fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>Ver ▶</td>
+                          </tr>
+                        );
+                      }) : [])
+                    ];
+                  });
+              })()}
             </tbody>
           </table>
         </div>

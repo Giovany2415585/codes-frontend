@@ -197,6 +197,48 @@
   font-weight: 600;
 }
 
+/* ─── GRUPOS TABLA PRINCIPAL ─── */
+
+.grupo-fecha-row {
+  cursor: pointer;
+  user-select: none;
+}
+
+.grupo-fecha-row:hover .grupo-fecha-header {
+  background: rgba(255,255,255,0.07);
+}
+
+.grupo-fecha-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 0;
+  transition: background 0.15s;
+}
+
+.grupo-fecha-arrow {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.4);
+  flex-shrink: 0;
+}
+
+.grupo-fecha-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.grupo-fecha-count {
+  font-size: 0.75rem;
+  background: rgba(99,102,241,0.2);
+  color: #a5b4fc;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
 .cuenta-selected {
   background: rgba(99,102,241,0.1) !important;
   border-color: rgba(99,102,241,0.3) !important;
