@@ -70,7 +70,7 @@ function Rentals() {
   const [activeTab, setActiveTab] = useState<"cuentas" | "pagos" | "garantias">("cuentas");
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "crear" | "editar" | "renovar" | "pago" | "pagoMasivo" | "garantia" | "resolver" | "delete" | null
+    "crear" | "editar" | "renovar" | "pago" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | null
   >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
@@ -200,6 +200,22 @@ function Rentals() {
       setSelectedCuentas([]);
     } else {
       setSelectedCuentas(clientRentals.map((r) => r.id));
+    }
+  };
+
+  const handleEliminarMasivo = async () => {
+    if (selectedCuentas.length === 0) return;
+    try {
+      for (const id of selectedCuentas) {
+        await apiFetch(`/api/alquileres/${id}`, { method: "DELETE" });
+      }
+      toast.success(`${selectedCuentas.length} cuenta(s) eliminada(s)`);
+      setShowModal(false);
+      setSelectedCuentas([]);
+      await loadRentals();
+      if (selectedClient) refreshClientDetail(selectedClient);
+    } catch (err: any) {
+      toast.error(err.message || "Error eliminando cuentas");
     }
   };
 
@@ -702,16 +718,27 @@ function Rentals() {
                     )}
                   </label>
                   {selectedCuentas.length > 0 && (
-                    <button
-                      className="btn-pago-masivo"
-                      onClick={() => {
-                        setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
-                        setModalType("pagoMasivo");
-                        setShowModal(true);
-                      }}
-                    >
-                      💳 Registrar pago a {selectedCuentas.length} cuenta(s)
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="btn-pago-masivo"
+                        onClick={() => {
+                          setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+                          setModalType("pagoMasivo");
+                          setShowModal(true);
+                        }}
+                      >
+                        💳 Registrar pago a {selectedCuentas.length} cuenta(s)
+                      </button>
+                      <button
+                        className="btn-eliminar-masivo"
+                        onClick={() => {
+                          setModalType("deleteMasivo");
+                          setShowModal(true);
+                        }}
+                      >
+                        🗑 Eliminar {selectedCuentas.length} seleccionada(s)
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="cuentas-scroll-list">
@@ -1305,6 +1332,22 @@ function Rentals() {
                 />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleResolverGarantia}>Resolver</button>
+                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                </div>
+              </>
+            )}
+
+            {/* MODAL DELETE MASIVO */}
+            {modalType === "deleteMasivo" && (
+              <>
+                <h3>¿Eliminar cuentas seleccionadas?</h3>
+                <p className="modal-subtitle">
+                  Se eliminarán {selectedCuentas.length} cuenta(s) con todos sus pagos y garantías. Esta acción no se puede deshacer.
+                </p>
+                <div className="modal-actions">
+                  <button className="btn-danger" onClick={handleEliminarMasivo}>
+                    Eliminar {selectedCuentas.length} cuenta(s)
+                  </button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>

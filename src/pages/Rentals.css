@@ -120,6 +120,21 @@
 
 .btn-pago-masivo:hover { background: rgba(34,197,94,0.28); }
 
+.btn-eliminar-masivo {
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px;
+  color: #f87171;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-eliminar-masivo:hover { background: rgba(239,68,68,0.28); }
+
 .cuenta-selected {
   background: rgba(99,102,241,0.1) !important;
   border-color: rgba(99,102,241,0.3) !important;
