@@ -11,7 +11,7 @@
   background: var(--bg-main);
   color: var(--text-primary);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .navbar {
