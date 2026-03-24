@@ -297,7 +297,7 @@ function Rentals() {
       toast.success(`Pago registrado en ${selectedCuentas.length} cuenta(s)`);
       setShowModal(false);
       setSelectedCuentas([]);
-      setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
+      setFormPagoMasivo({ monto: "", divisa: "COP", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
       if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error registrando pagos");
@@ -427,12 +427,8 @@ function Rentals() {
       setFormRental({
         user_id: "", plataforma: "", correo: "",
         fecha_inicio: new Date().toISOString().split("T")[0],
-        dias: "30", precio: "", notas: "",
+        dias: "30", precio: "", divisa: "COP", notas: "",
       });
-      setBulkInput("");
-      setBulkCorreos([]);
-      setCorreosDisponibles([]);
-      loadRentals();
     } catch (err: any) {
       toast.error(err.message || "Error creando alquiler");
     }
@@ -557,6 +553,7 @@ function Rentals() {
         dias: String(dias),
         fecha_fin: rental.fecha_fin.split("T")[0],
         precio: String(rental.precio),
+        divisa: "COP",
         estado: rental.estado,
         notas: rental.notas || "",
       });
@@ -565,7 +562,7 @@ function Rentals() {
     }
 
     if (type === "renovar") setFormDias("30");
-    if (type === "pago") setFormPago({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
+    if (type === "pago") setFormPago({ monto: "", divisa: "COP", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
     if (type === "garantia") setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
@@ -601,7 +598,7 @@ function Rentals() {
             setFormRental({
               user_id: "", plataforma: "", correo: "",
               fecha_inicio: new Date().toISOString().split("T")[0],
-              dias: "30", precio: "", notas: "",
+              dias: "30", precio: "", divisa: "COP", notas: "",
             });
             setBulkInput("");
             setBulkCorreos([]);
@@ -795,7 +792,7 @@ function Rentals() {
                   </label>
                   {selectedCuentas.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button className="btn-pago-masivo" onClick={() => { setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" }); setModalType("pagoMasivo"); setShowModal(true); }}>
+                      <button className="btn-pago-masivo" onClick={() => { setFormPagoMasivo({ monto: "", divisa: "COP", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" }); setModalType("pagoMasivo"); setShowModal(true); }}>
                         💳 Registrar pago a {selectedCuentas.length} cuenta(s)
                       </button>
                       <button className="btn-eliminar-masivo" onClick={() => { setModalType("deleteMasivo"); setShowModal(true); }}>
@@ -897,7 +894,7 @@ function Rentals() {
                   })()}
                 </div>
 
-                <button className="btn-agregar-cuenta" onClick={() => { setFormRental({ user_id: String(selectedClient), plataforma: "", correo: "", fecha_inicio: new Date().toISOString().split("T")[0], dias: "30", precio: "", notas: "" }); loadCorreos(String(selectedClient)); setModalType("crear"); setShowModal(true); }}>
+                <button className="btn-agregar-cuenta" onClick={() => { setFormRental({ user_id: String(selectedClient), plataforma: "", correo: "", fecha_inicio: new Date().toISOString().split("T")[0], dias: "30", precio: "", divisa: "COP", notas: "" }); loadCorreos(String(selectedClient)); setModalType("crear"); setShowModal(true); }}>
                   + Agregar cuenta
                 </button>
               </div>
