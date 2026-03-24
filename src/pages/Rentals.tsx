@@ -240,9 +240,9 @@ function Rentals() {
 
   const parseBulkCorreos = (input: string) => {
     const parsed = input
-      .split(";")
+      .split(/[;\n,\s]+/)
       .map((c) => c.trim().toLowerCase())
-      .filter((c) => c.length > 0 && c.includes("@"));
+      .filter((c) => c.length > 0 && c.includes("@") && c.includes("."));
     const unique = [...new Set(parsed)];
     setBulkCorreos(unique);
   };
