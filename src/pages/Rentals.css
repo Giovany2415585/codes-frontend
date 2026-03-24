@@ -59,8 +59,8 @@
 
 .rentals-table-wrap {
   overflow-x: auto;
-  max-height: 420px;
-  overflow-y: auto;
+  height: 300px;
+  overflow-y: scroll;
   resize: vertical;
   min-height: 120px;
 }
