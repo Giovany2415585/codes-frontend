@@ -52,6 +52,11 @@ interface Plataforma {
   nombre: string;
 }
 
+interface MetodoPago {
+  id: number;
+  nombre: string;
+}
+
 function addDays(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day);
@@ -75,6 +80,9 @@ function Rentals() {
   const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
   const [nuevaPlataforma, setNuevaPlataforma] = useState("");
   const [showNuevaPlataforma, setShowNuevaPlataforma] = useState(false);
+  const [metodosPago, setMetodosPago] = useState<MetodoPago[]>([]);
+  const [nuevoMetodo, setNuevoMetodo] = useState("");
+  const [showNuevoMetodo, setShowNuevoMetodo] = useState(false);
   const [selectedClient, setSelectedClient] = useState<number | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [garantias, setGarantias] = useState<Garantia[]>([]);
@@ -91,10 +99,6 @@ function Rentals() {
   const [searchText, setSearchText] = useState("");
   const [filterCliente, setFilterCliente] = useState("");
   const [selectedCuentas, setSelectedCuentas] = useState<number[]>([]);
-  const [formPagoMasivo, setFormPagoMasivo] = useState({
-    monto: "", fecha_pago: new Date().toISOString().split("T")[0],
-    estado: "pagado", metodo: "efectivo", notas: "",
-  });
 
   // Correos disponibles para dropdown al seleccionar cliente
   const [correosDisponibles, setCorreosDisponibles] = useState<string[]>([]);
@@ -110,6 +114,7 @@ function Rentals() {
     fecha_inicio: new Date().toISOString().split("T")[0],
     dias: "30",
     precio: "",
+    divisa: "COP",
     notas: "",
   });
 
@@ -120,6 +125,7 @@ function Rentals() {
     dias: "30",
     fecha_fin: "",
     precio: "",
+    divisa: "COP",
     estado: "activo",
     notas: "",
   });
@@ -127,9 +133,18 @@ function Rentals() {
   const [formDias, setFormDias] = useState("30");
   const [formPago, setFormPago] = useState({
     monto: "",
+    divisa: "COP",
     fecha_pago: new Date().toISOString().split("T")[0],
     estado: "pagado",
-    metodo: "efectivo",
+    metodo: "",
+    notas: "",
+  });
+  const [formPagoMasivo, setFormPagoMasivo] = useState({
+    monto: "",
+    divisa: "COP",
+    fecha_pago: new Date().toISOString().split("T")[0],
+    estado: "pagado",
+    metodo: "",
     notas: "",
   });
   const [formGarantia, setFormGarantia] = useState({
@@ -144,6 +159,7 @@ function Rentals() {
     loadRentals();
     loadUsers();
     loadPlataformas();
+    loadMetodosPago();
   }, []);
 
   const loadRentals = async () => {
@@ -170,6 +186,35 @@ function Rentals() {
       setPlataformas(data);
     } catch {
       setPlataformas(DEFAULT_PLATAFORMAS.map((n, i) => ({ id: i + 1, nombre: n })));
+    }
+  };
+
+  const loadMetodosPago = async () => {
+    try {
+      const data = await apiFetch("/api/alquileres/metodos-pago");
+      setMetodosPago(data);
+      if (data.length > 0) {
+        setFormPago(f => ({ ...f, metodo: f.metodo || data[0].nombre }));
+        setFormPagoMasivo(f => ({ ...f, metodo: f.metodo || data[0].nombre }));
+      }
+    } catch {
+      setMetodosPago([{ id: 1, nombre: "Efectivo" }, { id: 2, nombre: "Nequi" }, { id: 3, nombre: "Daviplata" }, { id: 4, nombre: "Transferencia" }]);
+    }
+  };
+
+  const handleAgregarMetodo = async () => {
+    if (!nuevoMetodo.trim()) return;
+    try {
+      await apiFetch("/api/alquileres/metodos-pago", {
+        method: "POST",
+        body: JSON.stringify({ nombre: nuevoMetodo.trim() }),
+      });
+      toast.success(`Método "${nuevoMetodo.trim()}" agregado`);
+      await loadMetodosPago();
+      setNuevoMetodo("");
+      setShowNuevoMetodo(false);
+    } catch (err: any) {
+      toast.error(err.message || "Error agregando método");
     }
   };
 
@@ -252,7 +297,7 @@ function Rentals() {
       toast.success(`Pago registrado en ${selectedCuentas.length} cuenta(s)`);
       setShowModal(false);
       setSelectedCuentas([]);
-      setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+      setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
       if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error registrando pagos");
@@ -520,7 +565,7 @@ function Rentals() {
     }
 
     if (type === "renovar") setFormDias("30");
-    if (type === "pago") setFormPago({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
+    if (type === "pago") setFormPago({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
     if (type === "garantia") setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
@@ -750,7 +795,7 @@ function Rentals() {
                   </label>
                   {selectedCuentas.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button className="btn-pago-masivo" onClick={() => { setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" }); setModalType("pagoMasivo"); setShowModal(true); }}>
+                      <button className="btn-pago-masivo" onClick={() => { setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" }); setModalType("pagoMasivo"); setShowModal(true); }}>
                         💳 Registrar pago a {selectedCuentas.length} cuenta(s)
                       </button>
                       <button className="btn-eliminar-masivo" onClick={() => { setModalType("deleteMasivo"); setShowModal(true); }}>
@@ -784,6 +829,21 @@ function Rentals() {
                               )}
                             >
                               <span className="fecha-grupo-arrow">{isOpen ? "▼" : "▶"}</span>
+                              <input
+                                type="checkbox"
+                                checked={rentas.every(r => selectedCuentas.includes(r.id))}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const ids = rentas.map(r => r.id);
+                                  if (rentas.every(r => selectedCuentas.includes(r.id))) {
+                                    setSelectedCuentas(prev => prev.filter(id => !ids.includes(id)));
+                                  } else {
+                                    setSelectedCuentas(prev => [...new Set([...prev, ...ids])]);
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ accentColor: "#6c63ff", cursor: "pointer", flexShrink: 0 }}
+                              />
                               <span className="fecha-grupo-fecha">📅 {formatDate(fecha)}</span>
                               <span className="fecha-grupo-count">{rentas.length} cuenta{rentas.length > 1 ? "s" : ""}</span>
                               <div className="fecha-grupo-indicators">
@@ -1009,10 +1069,16 @@ function Rentals() {
 
                 <input
                   type="number"
-                  placeholder="Precio por cuenta (COP)"
+                  placeholder="Precio por cuenta"
                   value={formRental.precio}
                   onChange={(e) => setFormRental({ ...formRental, precio: e.target.value })}
                 />
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <select value={formRental.divisa} onChange={(e) => setFormRental({ ...formRental, divisa: e.target.value })} style={{ flex: 1 }}>
+                    <option value="COP">COP</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
 
                 <label>Organiza múltiples correos separados por <span style={{ color: "#a5b4fc", fontFamily: "monospace" }}>;</span></label>
                 <textarea
@@ -1192,10 +1258,14 @@ function Rentals() {
                 )}
                 <input
                   type="number"
-                  placeholder="Precio (COP)"
+                  placeholder="Precio"
                   value={formEditar.precio}
                   onChange={(e) => setFormEditar({ ...formEditar, precio: e.target.value })}
                 />
+                <select value={formEditar.divisa} onChange={(e) => setFormEditar({ ...formEditar, divisa: e.target.value })}>
+                  <option value="COP">COP</option>
+                  <option value="USDT">USDT</option>
+                </select>
                 <label>Estado</label>
                 <select
                   value={formEditar.estado}
@@ -1278,29 +1348,28 @@ function Rentals() {
                   value={formPago.fecha_pago}
                   onChange={(e) => setFormPago({ ...formPago, fecha_pago: e.target.value })}
                 />
-                <select
-                  value={formPago.estado}
-                  onChange={(e) => setFormPago({ ...formPago, estado: e.target.value })}
-                >
+                <select value={formPago.estado} onChange={(e) => setFormPago({ ...formPago, estado: e.target.value })}>
                   <option value="pagado">Pagado</option>
                   <option value="pendiente">Pendiente</option>
                   <option value="vencido">Vencido</option>
                 </select>
-                <select
-                  value={formPago.metodo}
-                  onChange={(e) => setFormPago({ ...formPago, metodo: e.target.value })}
-                >
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="nequi">Nequi</option>
-                  <option value="daviplata">Daviplata</option>
-                  <option value="otro">Otro</option>
+                <label>Divisa</label>
+                <select value={formPago.divisa} onChange={(e) => setFormPago({ ...formPago, divisa: e.target.value })}>
+                  <option value="COP">COP — Peso colombiano</option>
+                  <option value="USDT">USDT — Dólar</option>
                 </select>
-                <textarea
-                  placeholder="Notas (opcional)"
-                  value={formPago.notas}
-                  onChange={(e) => setFormPago({ ...formPago, notas: e.target.value })}
-                />
+                <label>Método de pago</label>
+                <select value={formPago.metodo} onChange={(e) => { if (e.target.value === "__nuevo__") { setShowNuevoMetodo(true); } else { setFormPago({ ...formPago, metodo: e.target.value }); setShowNuevoMetodo(false); } }}>
+                  {metodosPago.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                  <option value="__nuevo__">➕ Agregar método...</option>
+                </select>
+                {showNuevoMetodo && (
+                  <div className="nueva-plataforma-row">
+                    <input type="text" placeholder="Nombre del método" value={nuevoMetodo} onChange={(e) => setNuevoMetodo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAgregarMetodo()} autoFocus />
+                    <button className="btn-agregar-plat" onClick={handleAgregarMetodo}>Agregar</button>
+                  </div>
+                )}
+                <textarea placeholder="Notas (opcional)" value={formPago.notas} onChange={(e) => setFormPago({ ...formPago, notas: e.target.value })} />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRegistrarPago}>Registrar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1396,35 +1465,30 @@ function Rentals() {
                   onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, monto: e.target.value })}
                   min="0"
                 />
+                <label>Divisa</label>
+                <select value={formPagoMasivo.divisa} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, divisa: e.target.value })}>
+                  <option value="COP">COP — Peso colombiano</option>
+                  <option value="USDT">USDT — Dólar</option>
+                </select>
                 <label>Fecha de pago</label>
-                <input
-                  type="date"
-                  value={formPagoMasivo.fecha_pago}
-                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, fecha_pago: e.target.value })}
-                />
-                <select
-                  value={formPagoMasivo.estado}
-                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, estado: e.target.value })}
-                >
+                <input type="date" value={formPagoMasivo.fecha_pago} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, fecha_pago: e.target.value })} />
+                <select value={formPagoMasivo.estado} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, estado: e.target.value })}>
                   <option value="pagado">Pagado</option>
                   <option value="pendiente">Pendiente</option>
                   <option value="vencido">Vencido</option>
                 </select>
-                <select
-                  value={formPagoMasivo.metodo}
-                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, metodo: e.target.value })}
-                >
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="nequi">Nequi</option>
-                  <option value="daviplata">Daviplata</option>
-                  <option value="otro">Otro</option>
+                <label>Método de pago</label>
+                <select value={formPagoMasivo.metodo} onChange={(e) => { if (e.target.value === "__nuevo__") { setShowNuevoMetodo(true); } else { setFormPagoMasivo({ ...formPagoMasivo, metodo: e.target.value }); setShowNuevoMetodo(false); } }}>
+                  {metodosPago.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                  <option value="__nuevo__">➕ Agregar método...</option>
                 </select>
-                <textarea
-                  placeholder="Notas (opcional)"
-                  value={formPagoMasivo.notas}
-                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, notas: e.target.value })}
-                />
+                {showNuevoMetodo && (
+                  <div className="nueva-plataforma-row">
+                    <input type="text" placeholder="Nombre del método" value={nuevoMetodo} onChange={(e) => setNuevoMetodo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAgregarMetodo()} autoFocus />
+                    <button className="btn-agregar-plat" onClick={handleAgregarMetodo}>Agregar</button>
+                  </div>
+                )}
+                <textarea placeholder="Notas (opcional)" value={formPagoMasivo.notas} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, notas: e.target.value })} />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handlePagoMasivo}>
                     Registrar {selectedCuentas.length} pago(s)
