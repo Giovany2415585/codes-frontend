@@ -786,6 +786,20 @@ function Rentals() {
                               <span className="fecha-grupo-arrow">{isOpen ? "▼" : "▶"}</span>
                               <span className="fecha-grupo-fecha">📅 {formatDate(fecha)}</span>
                               <span className="fecha-grupo-count">{rentas.length} cuenta{rentas.length > 1 ? "s" : ""}</span>
+                              <div className="fecha-grupo-indicators">
+                                {(() => {
+                                  const pagadas = rentas.filter(r => r.pago_estado === "pagado").length;
+                                  const pendientes = rentas.filter(r => r.pago_estado === "pendiente").length;
+                                  const sinPago = rentas.filter(r => !r.pago_estado).length;
+                                  return (
+                                    <>
+                                      {pagadas > 0 && <span className="ind-badge pagado">✓ {pagadas} pagado{pagadas > 1 ? "s" : ""}</span>}
+                                      {pendientes > 0 && <span className="ind-badge pendiente">⏳ {pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
+                                      {sinPago > 0 && <span className="ind-badge sin-pago">— {sinPago} sin pago</span>}
+                                    </>
+                                  );
+                                })()}
+                              </div>
                               <span className={`dias-badge ${colorFecha}`} style={{ marginLeft: "auto" }}>
                                 {minDias < 0 ? `${Math.abs(minDias)}d vencido` : `${minDias}d`}
                               </span>
