@@ -79,6 +79,7 @@ function Rentals() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [garantias, setGarantias] = useState<Garantia[]>([]);
   const [activeTab, setActiveTab] = useState<"cuentas" | "pagos" | "garantias">("cuentas");
+  const [gruposAbiertos, setGruposAbiertos] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
     "crear" | "editar" | "renovar" | "pago" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | null
@@ -730,88 +731,80 @@ function Rentals() {
                   </label>
                   {selectedCuentas.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        className="btn-pago-masivo"
-                        onClick={() => {
-                          setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" });
-                          setModalType("pagoMasivo");
-                          setShowModal(true);
-                        }}
-                      >
+                      <button className="btn-pago-masivo" onClick={() => { setFormPagoMasivo({ monto: "", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: "efectivo", notas: "" }); setModalType("pagoMasivo"); setShowModal(true); }}>
                         💳 Registrar pago a {selectedCuentas.length} cuenta(s)
                       </button>
-                      <button
-                        className="btn-eliminar-masivo"
-                        onClick={() => {
-                          setModalType("deleteMasivo");
-                          setShowModal(true);
-                        }}
-                      >
+                      <button className="btn-eliminar-masivo" onClick={() => { setModalType("deleteMasivo"); setShowModal(true); }}>
                         🗑 Eliminar {selectedCuentas.length} seleccionada(s)
                       </button>
                     </div>
                   )}
                 </div>
+
+                {/* Grupos por fecha de vencimiento */}
                 <div className="cuentas-scroll-list">
-                  {clientRentals.map((r) => (
-                    <div
-                      key={r.id}
-                      className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""} ${selectedCuentas.includes(r.id) ? "cuenta-selected" : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedCuentas.includes(r.id)}
-                        onChange={() => toggleCuenta(r.id)}
-                        style={{ accentColor: "#6c63ff", cursor: "pointer", flexShrink: 0 }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <div className="cuenta-info">
-                        <span className="plataforma-badge">{r.plataforma}</span>
-                        {r.correo && (
-                          <span className="correo-cuenta-detail">📧 {r.correo}</span>
-                        )}
-                        <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                          {formatDate(r.fecha_inicio)} →{" "}
-                          {formatDate(r.fecha_fin)}
-                        </span>
-                        <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
-                          {r.dias_restantes < 0
-                            ? `${Math.abs(r.dias_restantes)}d vencido`
-                            : `${r.dias_restantes}d restantes`}
-                        </span>
-                        <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>
-                          {r.pago_estado || "sin pago"}
-                        </span>
-                        {r.precio > 0 && (
-                          <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                            ${Number(r.precio).toLocaleString("es-CO")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="cuenta-actions">
-                        <button className="btn-icon editar" title="Editar" onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}>✏️</button>
-                        <button className="btn-icon renovar" title="Renovar" onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}>↻</button>
-                        <button className="btn-icon pago" title="Pago" onClick={(e) => { e.stopPropagation(); openModal("pago", r); }}>💳</button>
-                        <button className="btn-icon garantia" title="Garantía" onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}>🛡️</button>
-                        <button className="btn-icon delete" title="Eliminar" onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}>✕</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  className="btn-agregar-cuenta"
-                  onClick={() => {
-                    setFormRental({
-                      user_id: String(selectedClient),
-                      plataforma: "", correo: "",
-                      fecha_inicio: new Date().toISOString().split("T")[0],
-                      dias: "30", precio: "", notas: "",
+                  {(() => {
+                    const grupos: { [fecha: string]: Rental[] } = {};
+                    clientRentals.forEach((r) => {
+                      const key = r.fecha_fin.split("T")[0];
+                      if (!grupos[key]) grupos[key] = [];
+                      grupos[key].push(r);
                     });
-                    loadCorreos(String(selectedClient));
-                    setModalType("crear");
-                    setShowModal(true);
-                  }}
-                >
+                    return Object.entries(grupos)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([fecha, rentas]) => {
+                        const isOpen = gruposAbiertos.includes(fecha);
+                        const minDias = Math.min(...rentas.map(r => r.dias_restantes));
+                        const colorFecha = minDias < 0 ? "urgente" : minDias <= 3 ? "urgente" : minDias <= 7 ? "proximo" : "ok";
+                        return (
+                          <div key={fecha} className="fecha-grupo">
+                            <div
+                              className={`fecha-grupo-header ${colorFecha}`}
+                              onClick={() => setGruposAbiertos(prev =>
+                                prev.includes(fecha) ? prev.filter(f => f !== fecha) : [...prev, fecha]
+                              )}
+                            >
+                              <span className="fecha-grupo-arrow">{isOpen ? "▼" : "▶"}</span>
+                              <span className="fecha-grupo-fecha">📅 {formatDate(fecha)}</span>
+                              <span className="fecha-grupo-count">{rentas.length} cuenta{rentas.length > 1 ? "s" : ""}</span>
+                              <span className={`dias-badge ${colorFecha}`} style={{ marginLeft: "auto" }}>
+                                {minDias < 0 ? `${Math.abs(minDias)}d vencido` : `${minDias}d`}
+                              </span>
+                            </div>
+                            {isOpen && rentas.map((r) => (
+                              <div key={r.id} className={`detail-item cuenta-item ${r.dias_restantes <= 3 ? "por-vencer" : ""} ${selectedCuentas.includes(r.id) ? "cuenta-selected" : ""}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCuentas.includes(r.id)}
+                                  onChange={() => toggleCuenta(r.id)}
+                                  style={{ accentColor: "#6c63ff", cursor: "pointer", flexShrink: 0 }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="cuenta-info">
+                                  <span className="plataforma-badge">{r.plataforma}</span>
+                                  {r.correo && <span className="correo-cuenta-detail">📧 {r.correo}</span>}
+                                  <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
+                                    {r.dias_restantes < 0 ? `${Math.abs(r.dias_restantes)}d vencido` : `${r.dias_restantes}d restantes`}
+                                  </span>
+                                  <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>{r.pago_estado || "sin pago"}</span>
+                                  {r.precio > 0 && <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>${Number(r.precio).toLocaleString("es-CO")}</span>}
+                                </div>
+                                <div className="cuenta-actions">
+                                  <button className="btn-icon editar" title="Editar" onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}>✏️</button>
+                                  <button className="btn-icon renovar" title="Renovar" onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}>↻</button>
+                                  <button className="btn-icon pago" title="Pago" onClick={(e) => { e.stopPropagation(); openModal("pago", r); }}>💳</button>
+                                  <button className="btn-icon garantia" title="Garantía" onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}>🛡️</button>
+                                  <button className="btn-icon delete" title="Eliminar" onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}>✕</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      });
+                  })()}
+                </div>
+
+                <button className="btn-agregar-cuenta" onClick={() => { setFormRental({ user_id: String(selectedClient), plataforma: "", correo: "", fecha_inicio: new Date().toISOString().split("T")[0], dias: "30", precio: "", notas: "" }); loadCorreos(String(selectedClient)); setModalType("crear"); setShowModal(true); }}>
                   + Agregar cuenta
                 </button>
               </div>
