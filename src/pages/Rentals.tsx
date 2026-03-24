@@ -62,6 +62,13 @@ function addDays(dateStr: string, days: number): string {
   return `${y}-${m}-${d}`;
 }
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("T")[0].split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString("es-CO");
+}
+
 function Rentals() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -632,7 +639,7 @@ function Rentals() {
                     <td>
                       <div>
                         <span style={{ fontSize: "0.8rem" }}>
-                          {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
+                          {formatDate(r.fecha_fin)}
                         </span>
                         <br />
                         <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
@@ -764,8 +771,8 @@ function Rentals() {
                           <span className="correo-cuenta-detail">📧 {r.correo}</span>
                         )}
                         <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
-                          {new Date(r.fecha_inicio).toLocaleDateString("es-CO")} →{" "}
-                          {new Date(r.fecha_fin).toLocaleDateString("es-CO")}
+                          {formatDate(r.fecha_inicio)} →{" "}
+                          {formatDate(r.fecha_fin)}
                         </span>
                         <span className={`dias-badge ${getDiasColor(r.dias_restantes)}`}>
                           {r.dias_restantes < 0
@@ -824,7 +831,7 @@ function Rentals() {
                         <span className={`pago-badge ${p.estado}`}>{p.estado}</span>
                         <span className="pago-monto">${Number(p.monto).toLocaleString("es-CO")}</span>
                         <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.4)" }}>
-                          {new Date(p.fecha_pago).toLocaleDateString("es-CO")}
+                          {formatDate(p.fecha_pago)}
                         </span>
                         <span className="metodo-tag">{p.metodo}</span>
                       </div>
@@ -969,9 +976,7 @@ function Rentals() {
                 {formRental.fecha_inicio && formRental.dias && parseInt(formRental.dias) > 0 && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
                     📅 Vence:{" "}
-                    {new Date(
-                      addDays(formRental.fecha_inicio, parseInt(formRental.dias))
-                    ).toLocaleDateString("es-CO")}{" "}
+                    {formatDate(addDays(formRental.fecha_inicio, parseInt(formRental.dias)))}{" "}
                     — <strong>{formRental.dias} días</strong>
                   </p>
                 )}
@@ -1156,9 +1161,7 @@ function Rentals() {
                 {formEditar.fecha_inicio && formEditar.dias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
                     📅 Vence:{" "}
-                    {new Date(
-                      addDays(formEditar.fecha_inicio, parseInt(formEditar.dias) || 0)
-                    ).toLocaleDateString("es-CO")}
+                    {formatDate(addDays(formEditar.fecha_inicio, parseInt(formEditar.dias) || 0))}
                   </p>
                 )}
                 <input
@@ -1196,7 +1199,7 @@ function Rentals() {
                   {selectedRental?.plataforma}
                   {selectedRental?.correo && ` — ${selectedRental.correo}`}
                   {" — vence "}
-                  {selectedRental && new Date(selectedRental.fecha_fin).toLocaleDateString("es-CO")}
+                  {selectedRental && formatDate(selectedRental.fecha_fin)}
                 </p>
                 <label>Días a extender</label>
                 <div className="dias-quick">
@@ -1219,9 +1222,7 @@ function Rentals() {
                 {selectedRental && formDias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
                     📅 Nueva fecha fin:{" "}
-                    {new Date(
-                      addDays(selectedRental.fecha_fin, parseInt(formDias) || 0)
-                    ).toLocaleDateString("es-CO")}
+                    {formatDate(addDays(selectedRental.fecha_fin, parseInt(formDias) || 0))}
                   </p>
                 )}
                 <div className="modal-actions">
