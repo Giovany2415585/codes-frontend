@@ -54,7 +54,7 @@
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .rentals-table-wrap {
