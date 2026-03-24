@@ -233,6 +233,14 @@ function Rentals() {
 
   const handlePagoMasivo = async () => {
     if (selectedCuentas.length === 0) return;
+    if (!formPagoMasivo.monto || parseFloat(formPagoMasivo.monto) <= 0) {
+      toast.error("El monto es obligatorio");
+      return;
+    }
+    if (!formPagoMasivo.fecha_pago) {
+      toast.error("La fecha es obligatoria");
+      return;
+    }
     try {
       for (const id of selectedCuentas) {
         await apiFetch(`/api/alquileres/${id}/pagos`, {
@@ -1361,6 +1369,7 @@ function Rentals() {
                   placeholder="Monto (COP) *"
                   value={formPagoMasivo.monto}
                   onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, monto: e.target.value })}
+                  min="0"
                 />
                 <label>Fecha de pago</label>
                 <input
