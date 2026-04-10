@@ -250,6 +250,23 @@ function Users() {
     }
   };
 
+  const handleClearSubjectsFromSelected = async () => {
+    if (!selectedUser || selectedEmailIds.length === 0) return;
+    try {
+      await apiFetch("/api/admin/authorized-emails/bulk-subjects", {
+        method: "DELETE",
+        body: JSON.stringify({ authorized_email_ids: selectedEmailIds }),
+      });
+      toast.success(`Asuntos eliminados de ${selectedEmailIds.length} correo(s)`);
+      setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: false })));
+      setSubjects([]);
+      setSelectedEmail(null);
+      setShowModal(false);
+    } catch {
+      toast.error("Error eliminando asuntos");
+    }
+  };
+
   const handleAssignSubjectToMultiple = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) { toast.error(t("users.selectUserFirst")); return; }
@@ -498,6 +515,14 @@ function Users() {
                     🗑 Eliminar {selectedEmailIds.length} seleccionado(s)
                   </button>
                 )}
+                {selectedEmailIds.length > 0 && (
+                  <button
+                    className="btn-danger-small"
+                    onClick={() => { setModalType("clearSubjects" as any); setShowModal(true); }}
+                  >
+                    🧹 Quitar asuntos de {selectedEmailIds.length} seleccionado(s)
+                  </button>
+                )}
                 {selectedUser && authorizedEmails.length > 0 && (
                   <button className="btn-danger-small" onClick={() => { setModalType("deleteAllEmails"); setShowModal(true); }}>
                     🗑 Quitar todos
@@ -693,6 +718,16 @@ function Users() {
                   Se eliminarán todos los correos autorizados de {selectedUser?.first_name}. Esta acción no se puede deshacer.
                 </p>
                 <button onClick={handleDeleteAllEmails}>Eliminar todos</button>
+                <button onClick={() => setShowModal(false)}>Cancelar</button>
+              </>
+            )}
+            {(modalType as any) === "clearSubjects" && (
+              <>
+                <h3>¿Quitar todos los asuntos?</h3>
+                <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>
+                  Se eliminarán todos los asuntos de {selectedEmailIds.length} correo(s) seleccionado(s). Esta acción no se puede deshacer.
+                </p>
+                <button onClick={handleClearSubjectsFromSelected}>Quitar asuntos</button>
                 <button onClick={() => setShowModal(false)}>Cancelar</button>
               </>
             )}
