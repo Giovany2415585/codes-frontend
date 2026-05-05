@@ -381,21 +381,25 @@ function Rentals() {
   };
 
   const refreshClientDetail = async (userId: number) => {
-    const clientRentalsLocal = rentals.filter((r) => r.user_id === userId);
-    const allPagos: Pago[] = [];
-    const allGarantias: Garantia[] = [];
-    for (const r of clientRentalsLocal) {
-      try {
-        const [p, g] = await Promise.all([
-          apiFetch(`/api/alquileres/${r.id}/pagos`),
-          apiFetch(`/api/alquileres/${r.id}/garantias`),
-        ]);
-        allPagos.push(...p);
-        allGarantias.push(...g);
-      } catch {}
-    }
-    setPagos(allPagos);
-    setGarantias(allGarantias);
+    try {
+      const freshRentals: Rental[] = await apiFetch("/api/alquileres");
+      const clientRentalsLocal = freshRentals.filter((r) => r.user_id === userId);
+      const allPagos: Pago[] = [];
+      const allGarantias: Garantia[] = [];
+      for (const r of clientRentalsLocal) {
+        try {
+          const [p, g] = await Promise.all([
+            apiFetch(`/api/alquileres/${r.id}/pagos`),
+            apiFetch(`/api/alquileres/${r.id}/garantias`),
+          ]);
+          allPagos.push(...p);
+          allGarantias.push(...g);
+        } catch {}
+      }
+      setRentals(freshRentals);
+      setPagos(allPagos);
+      setGarantias(allGarantias);
+    } catch {}
   };
 
   const handleCreateRental = async () => {
@@ -486,6 +490,19 @@ function Rentals() {
       if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
       toast.error(err.message || "Error registrando pago");
+    }
+  };
+
+  const handleEditarPago = async (pagoId: number, nuevoEstado: string) => {
+    try {
+      await apiFetch(`/api/alquileres/pagos/${pagoId}`, {
+        method: "PUT",
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      toast.success("Pago actualizado");
+      if (selectedClient) refreshClientDetail(selectedClient);
+    } catch (err: any) {
+      toast.error(err.message || "Error actualizando pago");
     }
   };
 
@@ -917,6 +934,18 @@ function Rentals() {
                           {formatDate(p.fecha_pago)}
                         </span>
                         <span className="metodo-tag">{p.metodo}</span>
+                      </div>
+                      <div className="pago-actions">
+                        <select
+                          className="pago-estado-select"
+                          value={p.estado}
+                          onChange={(e) => handleEditarPago(p.id, e.target.value)}
+                          title="Cambiar estado del pago"
+                        >
+                          <option value="pagado">✓ Pagado</option>
+                          <option value="pendiente">⏳ Pendiente</option>
+                          <option value="vencido">✕ Vencido</option>
+                        </select>
                       </div>
                     </div>
                   );

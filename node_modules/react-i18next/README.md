@@ -75,7 +75,7 @@ The general i18next documentation is published on [www.i18next.com](https://www.
 
 - **Simplicity:** no need to change your webpack configuration or add additional babel transpilers, just use create-react-app and go.
 - **Production ready** we know there are more needs for production than just doing i18n on the clientside, so we offer wider support on [serverside](https://www.i18next.com/overview/supported-frameworks) too (nodejs, php, ruby, .net, ...). **Learn once - translate everywhere**.
-- **Beyond i18n** comes with [locize](https://locize.com) bridging the gap between development and translations - covering the whole translation process.
+- **Beyond i18n** comes with [Locize](https://locize.com) bridging the gap between development and translations - covering the whole translation process. Now with a **Free plan** for your side projects!
 
 ![ecosystem](https://raw.githubusercontent.com/i18next/i18next/master/assets/i18next-ecosystem.jpg)
 
@@ -169,12 +169,14 @@ This project follows the [all-contributors](https://github.com/kentcdodds/all-co
 
 ---
 
-**localization as a service - locize.com**
+**localization as a service - [Locize](https://www.locize.com)**
 
 Needing a translation management? Want to edit your translations with an InContext Editor? Use the original provided to you by the maintainers of i18next!
 
-![locize](https://www.locize.com/img/ads/github_locize.png)
+**Now with a [Free plan](https://www.locize.com/pricing) for small projects!** Perfect for hobbyists or getting started.
 
-By using [locize](http://locize.com/?utm_source=react_i18next_readme&utm_medium=github) you directly support the future of i18next and react-i18next.
+![Locize](https://www.locize.com/img/ads/github_locize.png)
+
+By using [Locize](http://www.locize.com/?utm_source=react_i18next_readme&utm_medium=github) you directly support the future of i18next and react-i18next.
 
 ---

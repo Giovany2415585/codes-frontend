@@ -21,6 +21,13 @@ interface AuthorizedEmail {
   id: number;
   email: string;
   selected?: boolean;
+  group_id?: number | null;
+}
+
+interface EmailGroup {
+  id: number;
+  name: string;
+  editing?: boolean;
 }
 
 interface Subject {
@@ -74,6 +81,10 @@ function Users() {
     u.email.toLowerCase().includes(userSearch.toLowerCase())
   );
   const [emailFile, setEmailFile] = useState<File | null>(null);
+  const [emailGroups, setEmailGroups] = useState<EmailGroup[]>([]);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [bulkEmailList, setBulkEmailList] = useState("");
+  const [showBulkEmailList, setShowBulkEmailList] = useState(false);
 
   const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
   const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
@@ -173,8 +184,12 @@ function Users() {
     setSubjects([]);
     setActiveSection("emails");
     try {
-      const data = await apiFetch(`/api/admin/users/${u.id}/authorized-emails`);
-      setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
+      const [emailData, groupData] = await Promise.all([
+        apiFetch(`/api/admin/users/${u.id}/authorized-emails`),
+        apiFetch(`/api/admin/users/${u.id}/email-groups`)
+      ]);
+      setAuthorizedEmails(emailData.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
+      setEmailGroups(groupData);
     } catch {
       toast.error(t("users.loadEmailsError"));
     }
@@ -250,6 +265,23 @@ function Users() {
     }
   };
 
+  const handleClearSubjectsFromSelected = async () => {
+    if (!selectedUser || selectedEmailIds.length === 0) return;
+    try {
+      await apiFetch("/api/admin/authorized-emails/bulk-subjects", {
+        method: "DELETE",
+        body: JSON.stringify({ authorized_email_ids: selectedEmailIds }),
+      });
+      toast.success(`Asuntos eliminados de ${selectedEmailIds.length} correo(s)`);
+      setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: false })));
+      setSubjects([]);
+      setSelectedEmail(null);
+      setShowModal(false);
+    } catch {
+      toast.error("Error eliminando asuntos");
+    }
+  };
+
   const handleAssignSubjectToMultiple = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) { toast.error(t("users.selectUserFirst")); return; }
@@ -270,6 +302,88 @@ function Users() {
       loadSavedSubjects();
     } catch (err: any) {
       toast.error(err.message || "Error asignando asunto");
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!selectedUser || !newGroupName.trim()) return;
+    try {
+      const group = await apiFetch(`/api/admin/users/${selectedUser.id}/email-groups`, {
+        method: "POST",
+        body: JSON.stringify({ name: newGroupName.trim() }),
+      });
+      setEmailGroups((prev) => [group, ...prev]);
+      setNewGroupName("");
+      toast.success("Carpeta creada");
+    } catch {
+      toast.error("Error creando carpeta");
+    }
+  };
+
+  const handleRenameGroup = async (group: EmailGroup, newName: string) => {
+    try {
+      await apiFetch(`/api/admin/email-groups/${group.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ name: newName }),
+      });
+      setEmailGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, name: newName, editing: false } : g));
+      toast.success("Carpeta renombrada");
+    } catch {
+      toast.error("Error renombrando carpeta");
+    }
+  };
+
+  const handleDeleteGroup = async (groupId: number) => {
+    try {
+      await apiFetch(`/api/admin/email-groups/${groupId}`, { method: "DELETE" });
+      setEmailGroups((prev) => prev.filter((g) => g.id !== groupId));
+      setAuthorizedEmails((prev) => prev.map((e) => e.group_id === groupId ? { ...e, group_id: null } : e));
+      toast.success("Carpeta eliminada");
+    } catch {
+      toast.error("Error eliminando carpeta");
+    }
+  };
+
+  const handleAssignGroupToSelected = async (groupId: number | null) => {
+    if (!selectedUser || selectedEmailIds.length === 0) return;
+    try {
+      await apiFetch("/api/admin/authorized-emails/bulk-group", {
+        method: "PUT",
+        body: JSON.stringify({ authorized_email_ids: selectedEmailIds, group_id: groupId }),
+      });
+      setAuthorizedEmails((prev) =>
+        prev.map((e) => selectedEmailIds.includes(e.id) ? { ...e, group_id: groupId, selected: false } : e)
+      );
+      toast.success(`Carpeta asignada a ${selectedEmailIds.length} correo(s)`);
+    } catch {
+      toast.error("Error asignando carpeta");
+    }
+  };
+
+  const toggleSelectGroup = (groupId: number) => {
+    const groupEmailIds = authorizedEmails.filter((e) => e.group_id === groupId).map((e) => e.id);
+    const allGroupSelected = groupEmailIds.every((id) => authorizedEmails.find((e) => e.id === id)?.selected);
+    setAuthorizedEmails((prev) =>
+      prev.map((e) => groupEmailIds.includes(e.id) ? { ...e, selected: !allGroupSelected } : e)
+    );
+  };
+
+  const handleBulkEmailList = async () => {
+    if (!selectedUser) { toast.error(t("users.selectUserFirst")); return; }
+    const emails = bulkEmailList.split("\n").map((e) => e.trim()).filter((e) => e.includes("@"));
+    if (emails.length === 0) { toast.error("No se encontraron correos válidos"); return; }
+    try {
+      await apiFetch("/api/admin/authorized-emails/bulk", {
+        method: "POST",
+        body: JSON.stringify({ user_id: selectedUser.id, emails }),
+      });
+      toast.success(`${emails.length} correo(s) agregado(s)`);
+      const data = await apiFetch(`/api/admin/users/${selectedUser.id}/authorized-emails`);
+      setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
+      setBulkEmailList("");
+      setShowBulkEmailList(false);
+    } catch {
+      toast.error("Error agregando correos");
     }
   };
 
@@ -498,6 +612,14 @@ function Users() {
                     🗑 Eliminar {selectedEmailIds.length} seleccionado(s)
                   </button>
                 )}
+                {selectedEmailIds.length > 0 && (
+                  <button
+                    className="btn-danger-small"
+                    onClick={() => { setModalType("clearSubjects" as any); setShowModal(true); }}
+                  >
+                    🧹 Quitar asuntos de {selectedEmailIds.length} seleccionado(s)
+                  </button>
+                )}
                 {selectedUser && authorizedEmails.length > 0 && (
                   <button className="btn-danger-small" onClick={() => { setModalType("deleteAllEmails"); setShowModal(true); }}>
                     🗑 Quitar todos
@@ -518,7 +640,48 @@ function Users() {
               )}
 
               <div className="authorized-emails-wrapper">
-                {filteredEmails.map((e) => (
+                {/* Grupos de correos */}
+                {emailGroups.map((group) => {
+                  const groupEmails = filteredEmails.filter((e) => e.group_id === group.id);
+                  if (groupEmails.length === 0) return null;
+                  const allGroupSelected = groupEmails.every((e) => e.selected);
+                  return (
+                    <div key={`group-${group.id}`} className="email-group">
+                      <div className="email-group-header">
+                        <input type="checkbox" checked={allGroupSelected} onChange={() => toggleSelectGroup(group.id)} className="email-checkbox" />
+                        {group.editing ? (
+                          <input
+                            className="group-name-input"
+                            defaultValue={group.name}
+                            autoFocus
+                            onBlur={(ev) => handleRenameGroup(group, ev.target.value)}
+                            onKeyDown={(ev) => { if (ev.key === "Enter") handleRenameGroup(group, ev.currentTarget.value); }}
+                          />
+                        ) : (
+                          <span className="email-group-name" onClick={() => setEmailGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, editing: true } : g))}>
+                            📁 {group.name} ({groupEmails.length})
+                          </span>
+                        )}
+                        <div className="chip-btn delete" onClick={() => handleDeleteGroup(group.id)}>✕</div>
+                      </div>
+                      {groupEmails.map((e) => (
+                        <div key={e.id} className={`email-row grouped ${selectedEmail?.id === e.id ? "active" : ""}`}>
+                          {selectedUser && (
+                            <input type="checkbox" checked={!!e.selected} onChange={() => toggleSelectEmail(e.id)} className="email-checkbox" />
+                          )}
+                          <span className="email-row-text" onClick={() => handleSelectEmail(e)}>{e.email}</span>
+                          <div className="chip-actions">
+                            <div className="chip-btn edit" onClick={() => openEditModal("email", e)}>✎</div>
+                      <div className="chip-btn delete" onClick={() => openDeleteModal("email", e)}>✕</div>
+                    </div>
+                  </div>
+                ))}
+                      </div>
+                    );
+                  })}
+
+                {/* Correos sin grupo */}
+                {filteredEmails.filter((e) => !e.group_id).map((e) => (
                   <div key={e.id} className={`email-row ${selectedEmail?.id === e.id ? "active" : ""}`}>
                     {selectedUser && (
                       <input type="checkbox" checked={!!e.selected} onChange={() => toggleSelectEmail(e.id)} className="email-checkbox" />
@@ -625,6 +788,44 @@ function Users() {
               <input placeholder={t("users.newAuthorizedEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               <button type="submit">{t("users.addEmail")}</button>
             </form>
+
+            {/* Agregar lista de correos por Enter */}
+            <div className="crud-form">
+              <button type="button" onClick={() => setShowBulkEmailList(!showBulkEmailList)}>
+                {showBulkEmailList ? "▲ Ocultar lista" : "📋 Agregar lista"}
+              </button>
+              {showBulkEmailList && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
+                  <textarea
+                    placeholder={"Un correo por línea:\ncorreo1@gmail.com\ncorreo2@gmail.com"}
+                    value={bulkEmailList}
+                    onChange={(e) => setBulkEmailList(e.target.value)}
+                    rows={5}
+                    style={{ width: "100%", padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)", resize: "vertical" }}
+                  />
+                  <button type="button" onClick={handleBulkEmailList}>Agregar correos</button>
+                </div>
+              )}
+            </div>
+
+            {/* Crear carpeta */}
+            <div className="crud-form">
+              <input placeholder="Nombre de carpeta..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
+              <button type="button" onClick={handleCreateGroup}>📁 Crear carpeta</button>
+            </div>
+
+            {/* Asignar carpeta a seleccionados */}
+            {selectedEmailIds.length > 0 && emailGroups.length > 0 && (
+              <div className="crud-form">
+                <select onChange={(e) => handleAssignGroupToSelected(e.target.value ? Number(e.target.value) : null)}
+                  style={{ padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <option value="">📁 Mover a carpeta...</option>
+                  <option value="">Sin carpeta</option>
+                  {emailGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+            )}
+
             <div className="bulk-upload">
               <input ref={fileInputRef} type="file" accept=".txt" onChange={(e) => setEmailFile(e.target.files?.[0] || null)} />
               <button type="button" onClick={handleBulkEmails}>{t("users.uploadTxt")}</button>
@@ -693,6 +894,16 @@ function Users() {
                   Se eliminarán todos los correos autorizados de {selectedUser?.first_name}. Esta acción no se puede deshacer.
                 </p>
                 <button onClick={handleDeleteAllEmails}>Eliminar todos</button>
+                <button onClick={() => setShowModal(false)}>Cancelar</button>
+              </>
+            )}
+            {(modalType as any) === "clearSubjects" && (
+              <>
+                <h3>¿Quitar todos los asuntos?</h3>
+                <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>
+                  Se eliminarán todos los asuntos de {selectedEmailIds.length} correo(s) seleccionado(s). Esta acción no se puede deshacer.
+                </p>
+                <button onClick={handleClearSubjectsFromSelected}>Quitar asuntos</button>
                 <button onClick={() => setShowModal(false)}>Cancelar</button>
               </>
             )}
