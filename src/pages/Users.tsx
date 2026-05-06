@@ -81,11 +81,6 @@ function Users() {
   const [modalData, setModalData] = useState<any>(null);
   const [editValue, setEditValue] = useState("");
 
-  const filteredEmails = authorizedEmails.filter((e) => {
-    const matchesSearch = e.email.toLowerCase().includes(emailSearch.toLowerCase());
-    const matchesTag = activeTagFilter === null || e.tag_id === activeTagFilter;
-    return matchesSearch && matchesTag;
-  });
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -100,6 +95,12 @@ function Users() {
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#6366f1");
   const [showTagManager, setShowTagManager] = useState(false);
+
+  const filteredEmails = authorizedEmails.filter((e) => {
+    const matchesSearch = e.email.toLowerCase().includes(emailSearch.toLowerCase());
+    const matchesTag = activeTagFilter === null || e.tag_id === activeTagFilter;
+    return matchesSearch && matchesTag;
+  });
 
   const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
   const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
