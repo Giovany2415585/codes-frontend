@@ -729,19 +729,18 @@ function Users() {
 
               {/* Filtro por etiquetas */}
               {emailTags.length > 0 && (
-                <div className="tag-filter-bar">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px", padding: "4px 0" }}>
                   <button
-                    className={`tag-filter-btn ${activeTagFilter === null ? "active" : ""}`}
                     onClick={() => setActiveTagFilter(null)}
+                    style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: activeTagFilter === null ? "rgba(255,255,255,0.2)" : "transparent", color: "white", cursor: "pointer" }}
                   >Todos</button>
                   {emailTags.map((tag) => (
                     <button
                       key={tag.id}
-                      className={`tag-filter-btn ${activeTagFilter === tag.id ? "active" : ""}`}
-                      style={{ borderColor: tag.color, color: activeTagFilter === tag.id ? "white" : tag.color, background: activeTagFilter === tag.id ? tag.color : "transparent" }}
                       onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
+                      style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: `1px solid ${tag.color}`, background: activeTagFilter === tag.id ? tag.color : "transparent", color: activeTagFilter === tag.id ? "white" : tag.color, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
                     >
-                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: tag.color, marginRight: 4 }} />
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: tag.color, display: "inline-block", flexShrink: 0 }} />
                       {tag.name}
                     </button>
                   ))}
