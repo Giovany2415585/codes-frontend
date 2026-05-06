@@ -21,14 +21,7 @@ interface AuthorizedEmail {
   id: number;
   email: string;
   selected?: boolean;
-  group_id?: number | null;
   tag_id?: number | null;
-}
-
-interface EmailGroup {
-  id: number;
-  name: string;
-  editing?: boolean;
 }
 
 interface EmailTag {
@@ -80,21 +73,18 @@ function Users() {
   const subjectFileInputRef = useRef<HTMLInputElement | null>(null);
   const [modalData, setModalData] = useState<any>(null);
   const [editValue, setEditValue] = useState("");
-
-  const filteredUsers = users.filter((u) =>
-    u.email.toLowerCase().includes(userSearch.toLowerCase())
-  );
   const [emailFile, setEmailFile] = useState<File | null>(null);
-  const [emailGroups, setEmailGroups] = useState<EmailGroup[]>([]);
-  const [newGroupName, setNewGroupName] = useState("");
   const [bulkEmailList, setBulkEmailList] = useState("");
   const [showBulkEmailList, setShowBulkEmailList] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
   const [emailTags, setEmailTags] = useState<EmailTag[]>([]);
   const [activeTagFilter, setActiveTagFilter] = useState<number | null>(null);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#6366f1");
   const [showTagManager, setShowTagManager] = useState(false);
+
+  const filteredUsers = users.filter((u) =>
+    u.email.toLowerCase().includes(userSearch.toLowerCase())
+  );
 
   const filteredEmails = authorizedEmails.filter((e) => {
     const matchesSearch = e.email.toLowerCase().includes(emailSearch.toLowerCase());
@@ -106,9 +96,7 @@ function Users() {
   const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
 
   const toggleSelectEmail = (id: number) => {
-    setAuthorizedEmails((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e))
-    );
+    setAuthorizedEmails((prev) => prev.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
   };
 
   const toggleSelectAll = () => {
@@ -208,12 +196,8 @@ function Users() {
     setSubjects([]);
     setActiveSection("emails");
     try {
-      const [emailData, groupData] = await Promise.all([
-        apiFetch(`/api/admin/users/${u.id}/authorized-emails`),
-        apiFetch(`/api/admin/users/${u.id}/email-groups`)
-      ]);
-      setAuthorizedEmails(emailData.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
-      setEmailGroups(groupData);
+      const data = await apiFetch(`/api/admin/users/${u.id}/authorized-emails`);
+      setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
     } catch {
       toast.error(t("users.loadEmailsError"));
     }
@@ -237,9 +221,7 @@ function Users() {
   const handleDeleteAllEmails = async () => {
     if (!selectedUser) return;
     try {
-      await apiFetch(`/api/admin/users/${selectedUser.id}/authorized-emails/all`, {
-        method: "DELETE",
-      });
+      await apiFetch(`/api/admin/users/${selectedUser.id}/authorized-emails/all`, { method: "DELETE" });
       toast.success("Todos los correos eliminados");
       setAuthorizedEmails([]);
       setShowModal(false);
@@ -314,11 +296,7 @@ function Users() {
     try {
       await apiFetch("/api/admin/subjects/bulk-multi-email", {
         method: "POST",
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          authorized_email_ids: selectedEmailIds,
-          subject_name: bulkSubjectName,
-        }),
+        body: JSON.stringify({ user_id: selectedUser.id, authorized_email_ids: selectedEmailIds, subject_name: bulkSubjectName }),
       });
       toast.success(`Asunto asignado a ${selectedEmailIds.length} correos`);
       setBulkSubjectName("");
@@ -327,91 +305,6 @@ function Users() {
     } catch (err: any) {
       toast.error(err.message || "Error asignando asunto");
     }
-  };
-
-  const handleCreateGroup = async () => {
-    if (!selectedUser || !newGroupName.trim()) return;
-    try {
-      const group = await apiFetch(`/api/admin/users/${selectedUser.id}/email-groups`, {
-        method: "POST",
-        body: JSON.stringify({ name: newGroupName.trim() }),
-      });
-      setEmailGroups((prev) => [group, ...prev]);
-      setNewGroupName("");
-      toast.success("Carpeta creada");
-    } catch {
-      toast.error("Error creando carpeta");
-    }
-  };
-
-  const handleRenameGroup = async (group: EmailGroup, newName: string) => {
-    try {
-      await apiFetch(`/api/admin/email-groups/${group.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ name: newName }),
-      });
-      setEmailGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, name: newName, editing: false } : g));
-      toast.success("Carpeta renombrada");
-    } catch {
-      toast.error("Error renombrando carpeta");
-    }
-  };
-
-  const handleDeleteGroup = async (groupId: number) => {
-    try {
-      await apiFetch(`/api/admin/email-groups/${groupId}`, { method: "DELETE" });
-      setEmailGroups((prev) => prev.filter((g) => g.id !== groupId));
-      setAuthorizedEmails((prev) => prev.map((e) => e.group_id === groupId ? { ...e, group_id: null } : e));
-      toast.success("Carpeta eliminada");
-    } catch {
-      toast.error("Error eliminando carpeta");
-    }
-  };
-
-  const handleAssignGroupToSelected = async (groupId: number | null) => {
-    if (!selectedUser || selectedEmailIds.length === 0) return;
-    try {
-      await apiFetch("/api/admin/authorized-emails/bulk-group", {
-        method: "PUT",
-        body: JSON.stringify({ authorized_email_ids: selectedEmailIds, group_id: groupId }),
-      });
-      setAuthorizedEmails((prev) =>
-        prev.map((e) => selectedEmailIds.includes(e.id) ? { ...e, group_id: groupId, selected: false } : e)
-      );
-      toast.success(`Carpeta asignada a ${selectedEmailIds.length} correo(s)`);
-    } catch {
-      toast.error("Error asignando carpeta");
-    }
-  };
-
-  const toggleCollapseGroup = (groupId: number) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
-  };
-
-  const handleRemoveFromGroup = async (emailId: number) => {
-    try {
-      await apiFetch(`/api/admin/authorized-emails/${emailId}/group`, {
-        method: "PUT",
-        body: JSON.stringify({ group_id: null }),
-      });
-      setAuthorizedEmails((prev) => prev.map((e) => e.id === emailId ? { ...e, group_id: null } : e));
-      toast.success("Correo removido de la carpeta");
-    } catch {
-      toast.error("Error removiendo correo de carpeta");
-    }
-  };
-
-  const toggleSelectGroup = (groupId: number) => {
-    const groupEmailIds = authorizedEmails.filter((e) => e.group_id === groupId).map((e) => e.id);
-    const allGroupSelected = groupEmailIds.every((id) => authorizedEmails.find((e) => e.id === id)?.selected);
-    setAuthorizedEmails((prev) =>
-      prev.map((e) => groupEmailIds.includes(e.id) ? { ...e, selected: !allGroupSelected } : e)
-    );
   };
 
   const handleBulkEmailList = async () => {
@@ -449,7 +342,7 @@ function Users() {
   const handleRemoveTagFromSelected = async () => {
     if (selectedEmailIds.length === 0) return;
     try {
-      await apiFetch("/api/admin/authorized-emails/bulk-tag", {
+      await apiFetch("/api/admin/authorized-emails-bulk-tag", {
         method: "PUT",
         body: JSON.stringify({ authorized_email_ids: selectedEmailIds, tag_id: null }),
       });
@@ -491,7 +384,7 @@ function Users() {
   const handleAssignTagToSelected = async (tagId: number | null) => {
     if (selectedEmailIds.length === 0) return;
     try {
-      await apiFetch("/api/admin/authorized-emails/bulk-tag", {
+      await apiFetch("/api/admin/authorized-emails-bulk-tag", {
         method: "PUT",
         body: JSON.stringify({ authorized_email_ids: selectedEmailIds, tag_id: tagId }),
       });
@@ -672,12 +565,8 @@ function Users() {
         }
         toast.success(t("users.deleted"));
       }
-      if (modalType === "deleteAllEmails") {
-        await handleDeleteAllEmails();
-        return;
-      }
       setShowModal(false);
-    } catch (err) {
+    } catch {
       toast.error(t("users.operationError"));
     }
   };
@@ -720,28 +609,19 @@ function Users() {
           <div className="right-top">
             <div className="emails-header">
               <h3>{t("users.authorizedEmails")}</h3>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {selectedEmailIds.length > 0 && (
-                  <button
-                    className="btn-danger-small"
-                    onClick={() => { setModalType("deleteSelected"); setShowModal(true); }}
-                  >
+                  <button className="btn-danger-small" onClick={() => { setModalType("deleteSelected"); setShowModal(true); }}>
                     🗑 Eliminar {selectedEmailIds.length} seleccionado(s)
                   </button>
                 )}
                 {selectedEmailIds.length > 0 && (
-                  <button
-                    className="btn-danger-small"
-                    onClick={() => { setModalType("clearSubjects" as any); setShowModal(true); }}
-                  >
+                  <button className="btn-danger-small" onClick={() => { setModalType("clearSubjects" as any); setShowModal(true); }}>
                     🧹 Quitar asuntos de {selectedEmailIds.length} seleccionado(s)
                   </button>
                 )}
                 {selectedEmailIds.length > 0 && authorizedEmails.filter(e => selectedEmailIds.includes(e.id) && e.tag_id).length > 0 && (
-                  <button
-                    className="btn-danger-small"
-                    onClick={handleRemoveTagFromSelected}
-                  >
+                  <button className="btn-danger-small" onClick={handleRemoveTagFromSelected}>
                     🏷️ Quitar etiqueta de {selectedEmailIds.length} seleccionado(s)
                   </button>
                 )}
@@ -767,16 +647,13 @@ function Users() {
               {/* Filtro por etiquetas */}
               {emailTags.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px", padding: "4px 0" }}>
-                  <button
-                    onClick={() => setActiveTagFilter(null)}
-                    style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: activeTagFilter === null ? "rgba(255,255,255,0.2)" : "transparent", color: "white", cursor: "pointer" }}
-                  >Todos</button>
+                  <button onClick={() => setActiveTagFilter(null)}
+                    style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: activeTagFilter === null ? "rgba(255,255,255,0.2)" : "transparent", color: "white", cursor: "pointer" }}>
+                    Todos
+                  </button>
                   {emailTags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
-                      style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: `1px solid ${tag.color}`, background: activeTagFilter === tag.id ? tag.color : "transparent", color: activeTagFilter === tag.id ? "white" : tag.color, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
-                    >
+                    <button key={tag.id} onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
+                      style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: `1px solid ${tag.color}`, background: activeTagFilter === tag.id ? tag.color : "transparent", color: activeTagFilter === tag.id ? "white" : tag.color, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: tag.color, display: "inline-block", flexShrink: 0 }} />
                       {tag.name}
                     </button>
@@ -785,60 +662,7 @@ function Users() {
               )}
 
               <div className="authorized-emails-wrapper">
-                {/* Grupos de correos colapsables */}
-                {emailGroups.map((group) => {
-                  const groupEmails = filteredEmails.filter((e) => e.group_id === group.id);
-                  if (groupEmails.length === 0 && !group.editing) return (
-                    <div key={`group-${group.id}`} className="email-group">
-                      <div className="email-group-header">
-                        <span className="email-group-name">📁 {group.name} (0)</span>
-                        <div className="chip-btn delete" onClick={() => handleDeleteGroup(group.id)} title="Eliminar carpeta">✕</div>
-                      </div>
-                    </div>
-                  );
-                  const allGroupSelected = groupEmails.length > 0 && groupEmails.every((e) => e.selected);
-                  const isCollapsed = collapsedGroups.has(group.id);
-                  return (
-                    <div key={`group-${group.id}`} className="email-group">
-                      <div className="email-group-header">
-                        <input type="checkbox" checked={allGroupSelected} onChange={() => toggleSelectGroup(group.id)} className="email-checkbox" />
-                        <span className="group-collapse-arrow" onClick={() => toggleCollapseGroup(group.id)}>
-                          {isCollapsed ? "▶" : "▼"}
-                        </span>
-                        {group.editing ? (
-                          <input
-                            className="group-name-input"
-                            defaultValue={group.name}
-                            autoFocus
-                            onBlur={(ev) => handleRenameGroup(group, ev.target.value)}
-                            onKeyDown={(ev) => { if (ev.key === "Enter") handleRenameGroup(group, ev.currentTarget.value); }}
-                          />
-                        ) : (
-                          <span className="email-group-name" onClick={() => setEmailGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, editing: true } : g))} title="Clic para renombrar">
-                            📁 {group.name} ({groupEmails.length})
-                          </span>
-                        )}
-                        <div className="chip-btn delete" onClick={() => handleDeleteGroup(group.id)} title="Eliminar carpeta">✕</div>
-                      </div>
-                      {!isCollapsed && groupEmails.map((e) => (
-                        <div key={e.id} className={`email-row grouped ${selectedEmail?.id === e.id ? "active" : ""}`}>
-                          {selectedUser && (
-                            <input type="checkbox" checked={!!e.selected} onChange={() => toggleSelectEmail(e.id)} className="email-checkbox" />
-                          )}
-                          <span className="email-row-text" onClick={() => handleSelectEmail(e)}>{e.email}</span>
-                          <div className="chip-actions">
-                            <div className="chip-btn edit" title="Sacar de carpeta" onClick={() => handleRemoveFromGroup(e.id)}>📤</div>
-                            <div className="chip-btn edit" onClick={() => openEditModal("email", e)}>✎</div>
-                            <div className="chip-btn delete" onClick={() => openDeleteModal("email", e)}>✕</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-
-                {/* Correos sin grupo */}
-                {filteredEmails.filter((e) => !e.group_id).map((e) => {
+                {filteredEmails.map((e) => {
                   const tag = emailTags.find((t) => t.id === e.tag_id);
                   return (
                     <div key={e.id} className={`email-row ${selectedEmail?.id === e.id ? "active" : ""}`}>
@@ -911,7 +735,6 @@ function Users() {
             </div>
           </div>
 
-          {/* Asuntos Peligrosos */}
           <div className="dangerous-section">
             <div className="subjects-header">
               <h3>🔴 Asuntos peligrosos</h3>
@@ -954,12 +777,13 @@ function Users() {
 
         {activeSection === "emails" && selectedUser && (
           <div className="crud-row">
+            {/* Agregar correo individual */}
             <form onSubmit={handleCreateEmail} className="crud-form">
               <input placeholder={t("users.newAuthorizedEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
               <button type="submit">{t("users.addEmail")}</button>
             </form>
 
-            {/* Agregar lista de correos por Enter */}
+            {/* Agregar lista */}
             <div className="crud-form">
               <button type="button" onClick={() => setShowBulkEmailList(!showBulkEmailList)}>
                 {showBulkEmailList ? "▲ Ocultar lista" : "📋 Agregar lista"}
@@ -978,29 +802,13 @@ function Users() {
               )}
             </div>
 
-            {/* Crear carpeta */}
-            <div className="crud-form">
-              <input placeholder="Nombre de carpeta..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
-              <button type="button" onClick={handleCreateGroup}>📁 Crear carpeta</button>
+            {/* Subir TXT */}
+            <div className="bulk-upload">
+              <input ref={fileInputRef} type="file" accept=".txt" onChange={(e) => setEmailFile(e.target.files?.[0] || null)} />
+              <button type="button" onClick={handleBulkEmails}>{t("users.uploadTxt")}</button>
             </div>
 
-            {/* Asignar etiqueta a seleccionados */}
-            {selectedEmailIds.length > 0 && (
-              <div className="crud-form">
-                <select
-                  onChange={(e) => handleAssignTagToSelected(e.target.value ? Number(e.target.value) : null)}
-                  style={{ padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}
-                >
-                  <option value="">🏷️ Asignar etiqueta...</option>
-                  <option value="">Sin etiqueta</option>
-                  {emailTags.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Gestor de etiquetas */}
+            {/* Gestionar etiquetas */}
             <div className="crud-form">
               <button type="button" onClick={() => setShowTagManager(!showTagManager)}>
                 🏷️ {showTagManager ? "Ocultar etiquetas" : "Gestionar etiquetas"}
@@ -1016,35 +824,37 @@ function Users() {
                     ))}
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input placeholder="Nueva etiqueta..." value={newTagName} onChange={(e) => setNewTagName(e.target.value)} style={{ flex: 1, padding: "6px", borderRadius: 6, background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)" }} />
-                    <input type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)} style={{ width: 36, height: 36, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent" }} />
+                    <input placeholder="Nueva etiqueta..." value={newTagName} onChange={(e) => setNewTagName(e.target.value)}
+                      style={{ flex: 1, padding: "6px", borderRadius: 6, background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)" }} />
+                    <input type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)}
+                      style={{ width: 36, height: 36, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent" }} />
                     <button type="button" onClick={handleCreateTag}>Crear</button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Asignar carpeta a seleccionados */}
-            {selectedEmailIds.length > 0 && emailGroups.length > 0 && (
+            {/* Etiquetar seleccionados */}
+            {selectedEmailIds.length > 0 && (
               <div className="crud-form">
-                <select onChange={(e) => handleAssignGroupToSelected(e.target.value ? Number(e.target.value) : null)}
+                <select onChange={(e) => handleAssignTagToSelected(e.target.value ? Number(e.target.value) : null)}
                   style={{ padding: "8px", borderRadius: "6px", background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  <option value="">📁 Mover a carpeta...</option>
-                  <option value="">Sin carpeta</option>
-                  {emailGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  <option value="">🏷️ Etiquetar {selectedEmailIds.length} correo(s)...</option>
+                  <option value="">Sin etiqueta</option>
+                  {emailTags.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
                 </select>
               </div>
             )}
 
-            <div className="bulk-upload">
-              <input ref={fileInputRef} type="file" accept=".txt" onChange={(e) => setEmailFile(e.target.files?.[0] || null)} />
-              <button type="button" onClick={handleBulkEmails}>{t("users.uploadTxt")}</button>
-            </div>
+            {/* Contraseña */}
             <form onSubmit={handleResetPassword} className="crud-form">
               <input type="password" placeholder={t("users.newPassword")} value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} />
               <button type="submit">{t("users.updatePassword")}</button>
             </form>
 
+            {/* Asignar asunto masivo */}
             {selectedEmailIds.length > 0 && (
               <form onSubmit={handleAssignSubjectToMultiple} className="crud-form bulk-subject-form">
                 <p className="bulk-subject-label">Asignar asunto a {selectedEmailIds.length} correo(s) seleccionado(s):</p>
@@ -1091,7 +901,7 @@ function Users() {
               <>
                 <h3>¿Eliminar correos seleccionados?</h3>
                 <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>
-                  Se eliminarán {selectedEmailIds.length} correo(s) seleccionado(s) de {selectedUser?.first_name}. Esta acción no se puede deshacer.
+                  Se eliminarán {selectedEmailIds.length} correo(s) de {selectedUser?.first_name}. Esta acción no se puede deshacer.
                 </p>
                 <button onClick={handleDeleteSelectedEmails}>Eliminar</button>
                 <button onClick={() => setShowModal(false)}>Cancelar</button>
