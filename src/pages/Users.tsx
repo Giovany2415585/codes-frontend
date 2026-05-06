@@ -85,6 +85,7 @@ function Users() {
   const [newGroupName, setNewGroupName] = useState("");
   const [bulkEmailList, setBulkEmailList] = useState("");
   const [showBulkEmailList, setShowBulkEmailList] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
 
   const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
   const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
@@ -357,6 +358,28 @@ function Users() {
       toast.success(`Carpeta asignada a ${selectedEmailIds.length} correo(s)`);
     } catch {
       toast.error("Error asignando carpeta");
+    }
+  };
+
+  const toggleCollapseGroup = (groupId: number) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
+
+  const handleRemoveFromGroup = async (emailId: number) => {
+    try {
+      await apiFetch(`/api/admin/authorized-emails/${emailId}/group`, {
+        method: "PUT",
+        body: JSON.stringify({ group_id: null }),
+      });
+      setAuthorizedEmails((prev) => prev.map((e) => e.id === emailId ? { ...e, group_id: null } : e));
+      toast.success("Correo removido de la carpeta");
+    } catch {
+      toast.error("Error removiendo correo de carpeta");
     }
   };
 
@@ -640,15 +663,26 @@ function Users() {
               )}
 
               <div className="authorized-emails-wrapper">
-                {/* Grupos de correos */}
+                {/* Grupos de correos colapsables */}
                 {emailGroups.map((group) => {
                   const groupEmails = filteredEmails.filter((e) => e.group_id === group.id);
-                  if (groupEmails.length === 0) return null;
-                  const allGroupSelected = groupEmails.every((e) => e.selected);
+                  if (groupEmails.length === 0 && !group.editing) return (
+                    <div key={`group-${group.id}`} className="email-group">
+                      <div className="email-group-header">
+                        <span className="email-group-name">📁 {group.name} (0)</span>
+                        <div className="chip-btn delete" onClick={() => handleDeleteGroup(group.id)} title="Eliminar carpeta">✕</div>
+                      </div>
+                    </div>
+                  );
+                  const allGroupSelected = groupEmails.length > 0 && groupEmails.every((e) => e.selected);
+                  const isCollapsed = collapsedGroups.has(group.id);
                   return (
                     <div key={`group-${group.id}`} className="email-group">
                       <div className="email-group-header">
                         <input type="checkbox" checked={allGroupSelected} onChange={() => toggleSelectGroup(group.id)} className="email-checkbox" />
+                        <span className="group-collapse-arrow" onClick={() => toggleCollapseGroup(group.id)}>
+                          {isCollapsed ? "▶" : "▼"}
+                        </span>
                         {group.editing ? (
                           <input
                             className="group-name-input"
@@ -658,27 +692,28 @@ function Users() {
                             onKeyDown={(ev) => { if (ev.key === "Enter") handleRenameGroup(group, ev.currentTarget.value); }}
                           />
                         ) : (
-                          <span className="email-group-name" onClick={() => setEmailGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, editing: true } : g))}>
+                          <span className="email-group-name" onClick={() => setEmailGroups((prev) => prev.map((g) => g.id === group.id ? { ...g, editing: true } : g))} title="Clic para renombrar">
                             📁 {group.name} ({groupEmails.length})
                           </span>
                         )}
-                        <div className="chip-btn delete" onClick={() => handleDeleteGroup(group.id)}>✕</div>
+                        <div className="chip-btn delete" onClick={() => handleDeleteGroup(group.id)} title="Eliminar carpeta">✕</div>
                       </div>
-                      {groupEmails.map((e) => (
+                      {!isCollapsed && groupEmails.map((e) => (
                         <div key={e.id} className={`email-row grouped ${selectedEmail?.id === e.id ? "active" : ""}`}>
                           {selectedUser && (
                             <input type="checkbox" checked={!!e.selected} onChange={() => toggleSelectEmail(e.id)} className="email-checkbox" />
                           )}
                           <span className="email-row-text" onClick={() => handleSelectEmail(e)}>{e.email}</span>
                           <div className="chip-actions">
+                            <div className="chip-btn edit" title="Sacar de carpeta" onClick={() => handleRemoveFromGroup(e.id)}>📤</div>
                             <div className="chip-btn edit" onClick={() => openEditModal("email", e)}>✎</div>
-                      <div className="chip-btn delete" onClick={() => openDeleteModal("email", e)}>✕</div>
+                            <div className="chip-btn delete" onClick={() => openDeleteModal("email", e)}>✕</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                ))}
-                      </div>
-                    );
-                  })}
+                  );
+                })}
 
                 {/* Correos sin grupo */}
                 {filteredEmails.filter((e) => !e.group_id).map((e) => (
