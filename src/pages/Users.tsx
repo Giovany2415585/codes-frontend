@@ -433,6 +433,35 @@ function Users() {
     }
   };
 
+  const handleRemoveTag = async (emailId: number) => {
+    try {
+      await apiFetch(`/api/admin/authorized-emails/${emailId}/tag`, {
+        method: "PUT",
+        body: JSON.stringify({ tag_id: null }),
+      });
+      setAuthorizedEmails((prev) => prev.map((e) => e.id === emailId ? { ...e, tag_id: null } : e));
+      toast.success("Etiqueta removida");
+    } catch {
+      toast.error("Error removiendo etiqueta");
+    }
+  };
+
+  const handleRemoveTagFromSelected = async () => {
+    if (selectedEmailIds.length === 0) return;
+    try {
+      await apiFetch("/api/admin/authorized-emails/bulk-tag", {
+        method: "PUT",
+        body: JSON.stringify({ authorized_email_ids: selectedEmailIds, tag_id: null }),
+      });
+      setAuthorizedEmails((prev) =>
+        prev.map((e) => selectedEmailIds.includes(e.id) ? { ...e, tag_id: null, selected: false } : e)
+      );
+      toast.success(`Etiqueta quitada de ${selectedEmailIds.length} correo(s)`);
+    } catch {
+      toast.error("Error quitando etiquetas");
+    }
+  };
+
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
     try {
@@ -708,6 +737,14 @@ function Users() {
                     🧹 Quitar asuntos de {selectedEmailIds.length} seleccionado(s)
                   </button>
                 )}
+                {selectedEmailIds.length > 0 && authorizedEmails.filter(e => selectedEmailIds.includes(e.id) && e.tag_id).length > 0 && (
+                  <button
+                    className="btn-danger-small"
+                    onClick={handleRemoveTagFromSelected}
+                  >
+                    🏷️ Quitar etiqueta de {selectedEmailIds.length} seleccionado(s)
+                  </button>
+                )}
                 {selectedUser && authorizedEmails.length > 0 && (
                   <button className="btn-danger-small" onClick={() => { setModalType("deleteAllEmails"); setShowModal(true); }}>
                     🗑 Quitar todos
@@ -808,7 +845,16 @@ function Users() {
                       {selectedUser && (
                         <input type="checkbox" checked={!!e.selected} onChange={() => toggleSelectEmail(e.id)} className="email-checkbox" />
                       )}
-                      {tag && <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: tag.color, marginRight: 4, flexShrink: 0 }} title={tag.name} />}
+                      {tag && (
+                        <span
+                          style={{ display: "inline-flex", alignItems: "center", gap: 2, padding: "1px 6px", borderRadius: 8, background: tag.color + "33", border: `1px solid ${tag.color}`, color: tag.color, fontSize: "0.65rem", flexShrink: 0, cursor: "pointer", marginRight: 4 }}
+                          title="Clic para quitar etiqueta"
+                          onClick={() => handleRemoveTag(e.id)}
+                        >
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: tag.color, display: "inline-block" }} />
+                          {tag.name}
+                        </span>
+                      )}
                       <span className="email-row-text" onClick={() => handleSelectEmail(e)}>{e.email}</span>
                       <div className="chip-actions">
                         <div className="chip-btn edit" onClick={() => openEditModal("email", e)}>✎</div>
