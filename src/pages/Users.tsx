@@ -88,7 +88,8 @@ function Users() {
 
   const filteredEmails = authorizedEmails.filter((e) => {
     const matchesSearch = e.email.toLowerCase().includes(emailSearch.toLowerCase());
-    const matchesTag = activeTagFilter === null || e.tag_id === activeTagFilter;
+    const matchesTag = activeTagFilter === null || 
+      (activeTagFilter === -1 ? !e.tag_id : e.tag_id === activeTagFilter);
     return matchesSearch && matchesTag;
   });
 
@@ -650,6 +651,10 @@ function Users() {
                   <button onClick={() => setActiveTagFilter(null)}
                     style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", background: activeTagFilter === null ? "rgba(255,255,255,0.2)" : "transparent", color: "white", cursor: "pointer" }}>
                     Todos
+                  </button>
+                  <button onClick={() => setActiveTagFilter(activeTagFilter === -1 ? null : -1)}
+                    style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: activeTagFilter === -1 ? "rgba(255,255,255,0.2)" : "transparent", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>
+                    Sin etiqueta
                   </button>
                   {emailTags.map((tag) => (
                     <button key={tag.id} onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
