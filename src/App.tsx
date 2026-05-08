@@ -10,6 +10,7 @@ import Profile from "./pages/Profile";
 import Layout from "./components/Layout";
 import Users from "./pages/Users";
 import Rentals from "./pages/Rentals";   // ← NUEVO
+import SecurityLogs from "./pages/SecurityLogs";
 
 
 function App() {
@@ -50,6 +51,7 @@ function App() {
             <Route path="/users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
             <Route path="rentals" element={<Rentals />} />   {/* ← NUEVO */}
+            <Route path="security" element={<SecurityLogs />} />
           </Route>
         </Routes>
 
