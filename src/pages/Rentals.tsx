@@ -130,6 +130,7 @@ function Rentals() {
   });
 
   const [formDias, setFormDias] = useState("30");
+  const [formRenovar, setFormRenovar] = useState({ precio: "", divisa: "COP" });
   const [formPagoMasivo, setFormPagoMasivo] = useState({
     monto: "",
     divisa: "COP",
@@ -139,9 +140,7 @@ function Rentals() {
     notas: "",
   });
   const [formGarantia, setFormGarantia] = useState({
-    fecha_reporte: new Date().toISOString().split("T")[0],
-    descripcion: "",
-    cuenta_reemplazo: "",
+    correo_nuevo: "",
     notas: "",
   });
   const [formResolver, setFormResolver] = useState({ cuenta_reemplazo: "", notas: "" });
@@ -469,9 +468,12 @@ function Rentals() {
   const handleRenovar = async () => {
     if (!selectedRental) return;
     try {
+      const body: any = { dias: parseInt(formDias) };
+      if (formRenovar.precio) body.precio = parseFloat(formRenovar.precio);
+      if (formRenovar.divisa) body.divisa = formRenovar.divisa;
       await apiFetch(`/api/alquileres/${selectedRental.id}/renovar`, {
         method: "PUT",
-        body: JSON.stringify({ dias: parseInt(formDias) }),
+        body: JSON.stringify(body),
       });
       toast.success(`Renovado por ${formDias} días`);
       setShowModal(false);
@@ -496,16 +498,24 @@ function Rentals() {
 
   const handleRegistrarGarantia = async () => {
     if (!selectedRental) return;
+    if (!formGarantia.correo_nuevo?.trim()) {
+      toast.error("Ingresa el correo de reemplazo");
+      return;
+    }
     try {
       await apiFetch(`/api/alquileres/${selectedRental.id}/garantias`, {
         method: "POST",
-        body: JSON.stringify(formGarantia),
+        body: JSON.stringify({
+          correo_nuevo: formGarantia.correo_nuevo,
+          notas: formGarantia.notas,
+        }),
       });
-      toast.success("Garantía registrada");
+      toast.success("✅ Garantía aplicada — correo reemplazado");
       setShowModal(false);
+      await loadRentals();
       if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
-      toast.error(err.message || "Error registrando garantía");
+      toast.error(err.message || "Error aplicando garantía");
     }
   };
 
@@ -564,8 +574,8 @@ function Rentals() {
       loadCorreos(String(rental.user_id));
     }
 
-    if (type === "renovar") setFormDias("30");
-    if (type === "garantia") setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
+    if (type === "renovar") { setFormDias("30"); setFormRenovar({ precio: String(rental?.precio || ""), divisa: (rental as any)?.divisa || "COP" }); }
+    if (type === "garantia") setFormGarantia({ correo_nuevo: "", notas: "" });
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
     setShowModal(true);
@@ -958,24 +968,25 @@ function Rentals() {
                 {garantias.length === 0 && <p className="empty-msg">Sin garantías registradas</p>}
                 {garantias.map((g, i) => {
                   const rental = clientRentals.find((r) => r.id === g.alquiler_id);
+                  // Extraer correo caído de la descripción
+                  const correoCaido = g.descripcion?.replace("Correo caído: ", "") || "";
                   return (
                     <div key={i} className="detail-item garantia-item">
                       <div className="garantia-info">
                         {rental && <span className="plataforma-badge">{rental.plataforma}</span>}
-                        {rental?.correo && (
-                          <span className="correo-tag">📧 {rental.correo}</span>
+                        {correoCaido && correoCaido !== "sin correo" && (
+                          <span className="correo-tag" style={{ textDecoration: "line-through", opacity: 0.5 }}>
+                            ❌ {correoCaido}
+                          </span>
                         )}
-                        <span className={`garantia-estado ${g.estado}`}>{g.estado}</span>
-                        <span className="garantia-desc">{g.descripcion}</span>
                         {g.cuenta_reemplazo && (
-                          <span className="garantia-reemplazo">→ {g.cuenta_reemplazo}</span>
+                          <span className="correo-tag" style={{ color: "#4ade80" }}>
+                            ✅ {g.cuenta_reemplazo}
+                          </span>
                         )}
+                        <span className={`garantia-estado resuelta`}>resuelta</span>
+                        {g.notas && <span className="garantia-desc">{g.notas}</span>}
                       </div>
-                      {g.estado === "pendiente" && (
-                        <button className="btn-resolver" onClick={() => openModal("resolver", undefined, g)}>
-                          Resolver
-                        </button>
-                      )}
                     </div>
                   );
                 })}
@@ -1199,6 +1210,23 @@ function Rentals() {
                     📅 Nueva fecha fin: {formatDate(addDays(selectedRental.fecha_fin, parseInt(formDias) || 0))}
                   </p>
                 )}
+                <label style={{ marginTop: "10px", display: "block" }}>Precio (opcional — actualiza si cambió)</label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    type="number"
+                    placeholder={`Precio actual: ${selectedRental?.precio || 0}`}
+                    value={formRenovar.precio}
+                    onChange={(e) => setFormRenovar({ ...formRenovar, precio: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <select
+                    value={formRenovar.divisa}
+                    onChange={(e) => setFormRenovar({ ...formRenovar, divisa: e.target.value })}
+                  >
+                    <option value="COP">COP</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRenovar}>Renovar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1209,18 +1237,49 @@ function Rentals() {
             {/* MODAL GARANTÍA */}
             {modalType === "garantia" && (
               <>
-                <h3>Registrar Garantía</h3>
+                <h3>🛡️ Aplicar Garantía</h3>
                 <p className="modal-subtitle">
                   {selectedRental?.plataforma}
-                  {selectedRental?.correo && (<span style={{ color: "#a5b4fc" }}> — {selectedRental.correo}</span>)}
+                  {selectedRental?.correo && (
+                    <span style={{ color: "#f87171" }}> — {selectedRental.correo}</span>
+                  )}
                 </p>
-                <label>Fecha de reporte</label>
-                <input type="date" value={formGarantia.fecha_reporte} onChange={(e) => setFormGarantia({ ...formGarantia, fecha_reporte: e.target.value })} />
-                <textarea placeholder="Descripción del problema *" value={formGarantia.descripcion} onChange={(e) => setFormGarantia({ ...formGarantia, descripcion: e.target.value })} />
-                <input placeholder="Cuenta de reemplazo (opcional)" value={formGarantia.cuenta_reemplazo} onChange={(e) => setFormGarantia({ ...formGarantia, cuenta_reemplazo: e.target.value })} />
-                <textarea placeholder="Notas (opcional)" value={formGarantia.notas} onChange={(e) => setFormGarantia({ ...formGarantia, notas: e.target.value })} />
+
+                {selectedRental?.correo && (
+                  <div style={{
+                    background: "rgba(248,113,113,0.1)",
+                    border: "1px solid rgba(248,113,113,0.3)",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    marginBottom: 14,
+                    fontSize: "0.82rem",
+                    color: "rgba(255,255,255,0.6)",
+                  }}>
+                    ❌ Correo caído: <code style={{ color: "#f87171" }}>{selectedRental.correo}</code>
+                  </div>
+                )}
+
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Correo de reemplazo *
+                </label>
+                <input
+                  type="email"
+                  placeholder="nuevo@gmail.com"
+                  value={formGarantia.correo_nuevo}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, correo_nuevo: e.target.value })}
+                  autoFocus
+                />
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formGarantia.notas}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, notas: e.target.value })}
+                  rows={2}
+                />
+                <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", margin: "4px 0 12px" }}>
+                  El correo caído será reemplazado y los asuntos asignados se transferirán al nuevo.
+                </p>
                 <div className="modal-actions">
-                  <button className="btn-primary" onClick={handleRegistrarGarantia}>Registrar</button>
+                  <button className="btn-primary" onClick={handleRegistrarGarantia}>Aplicar garantía</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
