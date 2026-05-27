@@ -12,6 +12,7 @@ interface SidebarProps {
 function Sidebar({ isOpen }: SidebarProps) {
   const { t } = useTranslation();
   const { user } = useContext(AuthContext);
+  const [collapsed, setCollapsed] = useState(false);
 
   const avatars = [
     "https://i.pravatar.cc/150?img=1",
@@ -41,36 +42,50 @@ function Sidebar({ isOpen }: SidebarProps) {
       ? new Date(user.lastConnection.replace(" ", "T")).toLocaleString()
       : "—";
 
+  const navItems = [
+    { to: "/home", icon: "🏠", label: t("sidebar.home") },
+    { to: "/codes", icon: "🔑", label: t("sidebar.codes") },
+    { to: "/authorizedEmails", icon: "📧", label: t("sidebar.authorizedEmails") },
+    ...(user.role === "admin" ? [
+      { to: "/users", icon: "👥", label: t("sidebar.users") },
+      { to: "/rentals", icon: "🎬", label: "Alquileres" },
+      { to: "/security", icon: "🔒", label: "Seguridad" },
+    ] : []),
+    { to: "/profile", icon: "👤", label: t("sidebar.profile") },
+  ];
+
   return (
-    <div className={`sidebar ${isOpen ? "open" : ""}`}>
+    <div className={`sidebar ${isOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}>
+      {/* Botón toggle solo en desktop */}
+      <button
+        className="sidebar-toggle-btn"
+        onClick={() => setCollapsed(!collapsed)}
+        title={collapsed ? "Expandir menú" : "Colapsar menú"}
+      >
+        {collapsed ? "▶" : "◀"}
+      </button>
+
       <div className="sidebar-top">
         <h2>{t("sidebar.title")}</h2>
-
-        <img src={logo} alt="Kitty Codes Logo" className="sidebar-logo" />
+        <img src={logo} alt="CINEBOX Logo" className="sidebar-logo" />
 
         <nav>
-          <Link to="/home">{t("sidebar.home")}</Link>
-          <Link to="/codes">{t("sidebar.codes")}</Link>
-          <Link to="/authorizedEmails">
-            {t("sidebar.authorizedEmails")}
-          </Link>
-          {user.role === "admin" && (
-            <Link to="/users">{t("sidebar.users")}</Link>
-          )}
-          {user.role === "admin" && (
-            <Link to="/rentals">Alquileres</Link>
-          )}
-          {user.role === "admin" && (
-            <Link to="/security">Seguridad</Link>
-          )}
-          <Link to="/profile">{t("sidebar.profile")}</Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              data-label={item.label}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
+            </Link>
+          ))}
         </nav>
       </div>
 
       <div className="sidebar-bottom">
         <div className="sidebar-profile">
           <img src={avatar} alt="Profile" onClick={changeAvatar} />
-
           <div className="profile-info">
             <p className="profile-name">{user.first_name}</p>
             <p className="profile-last">

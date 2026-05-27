@@ -37,7 +37,7 @@
 }
 
 .menu-btn {
-  display: none;
+  display: block;
   font-size: 22px;
   background: transparent;
   border: none;
