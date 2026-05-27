@@ -13,6 +13,7 @@ interface Rental {
   fecha_inicio: string;
   fecha_fin: string;
   precio: number;
+  divisa: string;
   estado: "activo" | "vencido" | "cancelado";
   notas: string;
   dias_restantes: number;
@@ -91,7 +92,7 @@ function Rentals() {
   const [gruposTablaAbiertos, setGruposTablaAbiertos] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "crear" | "editar" | "renovar" | "pago" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | null
+    "crear" | "editar" | "renovar" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | null
   >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
@@ -99,11 +100,9 @@ function Rentals() {
   const [searchText, setSearchText] = useState("");
   const [filterCliente, setFilterCliente] = useState("");
   const [selectedCuentas, setSelectedCuentas] = useState<number[]>([]);
+  const [enviandoResumen, setEnviandoResumen] = useState(false);
 
-  // Correos disponibles para dropdown al seleccionar cliente
   const [correosDisponibles, setCorreosDisponibles] = useState<string[]>([]);
-
-  // Bulk correos para crear múltiples alquileres
   const [bulkInput, setBulkInput] = useState("");
   const [bulkCorreos, setBulkCorreos] = useState<string[]>([]);
 
@@ -131,14 +130,6 @@ function Rentals() {
   });
 
   const [formDias, setFormDias] = useState("30");
-  const [formPago, setFormPago] = useState({
-    monto: "",
-    divisa: "COP",
-    fecha_pago: new Date().toISOString().split("T")[0],
-    estado: "pagado",
-    metodo: "",
-    notas: "",
-  });
   const [formPagoMasivo, setFormPagoMasivo] = useState({
     monto: "",
     divisa: "COP",
@@ -194,7 +185,6 @@ function Rentals() {
       const data = await apiFetch("/api/alquileres/metodos-pago");
       setMetodosPago(data);
       if (data.length > 0) {
-        setFormPago(f => ({ ...f, metodo: f.metodo || data[0].nombre }));
         setFormPagoMasivo(f => ({ ...f, metodo: f.metodo || data[0].nombre }));
       }
     } catch {
@@ -327,12 +317,23 @@ function Rentals() {
     }
   };
 
-  // Ordenar alquileres por fecha_fin ASC (más próximo primero)
+  // ── Resumen cliente → Telegram ─────────────────────────────────────────────
+  const handleEnviarResumen = async (userId: number) => {
+    setEnviandoResumen(true);
+    try {
+      await apiFetch(`/api/alquileres/resumen-telegram/${userId}`, { method: "POST" });
+      toast.success("📋 Resumen enviado a Telegram");
+    } catch (err: any) {
+      toast.error(err.message || "Error enviando resumen");
+    } finally {
+      setEnviandoResumen(false);
+    }
+  };
+
   const sortedRentals = [...rentals].sort((a, b) =>
     new Date(a.fecha_fin).getTime() - new Date(b.fecha_fin).getTime()
   );
 
-  // Aplanar: una fila por alquiler, no agrupado
   const flatRows = sortedRentals.filter((r) => {
     const matchSearch =
       r.cliente_nombre?.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -347,7 +348,6 @@ function Rentals() {
     return matchSearch && matchEstado && matchCliente;
   });
 
-  // Alquileres del cliente seleccionado (para el panel de detalle)
   const clientRentals = selectedClient
     ? sortedRentals.filter((r) => r.user_id === selectedClient)
     : [];
@@ -421,6 +421,7 @@ function Rentals() {
             fecha_inicio: formRental.fecha_inicio,
             fecha_fin,
             precio: parseFloat(formRental.precio) || 0,
+            divisa: formRental.divisa || "COP",
             notas: formRental.notas,
           }),
         });
@@ -433,6 +434,7 @@ function Rentals() {
         fecha_inicio: new Date().toISOString().split("T")[0],
         dias: "30", precio: "", divisa: "COP", notas: "",
       });
+      await loadRentals();
     } catch (err: any) {
       toast.error(err.message || "Error creando alquiler");
     }
@@ -450,6 +452,7 @@ function Rentals() {
           fecha_inicio: formEditar.fecha_inicio,
           fecha_fin,
           precio: parseFloat(formEditar.precio) || 0,
+          divisa: formEditar.divisa || "COP",
           estado: formEditar.estado,
           notas: formEditar.notas,
         }),
@@ -475,21 +478,6 @@ function Rentals() {
       loadRentals();
     } catch (err: any) {
       toast.error(err.message || "Error renovando");
-    }
-  };
-
-  const handleRegistrarPago = async () => {
-    if (!selectedRental) return;
-    try {
-      await apiFetch(`/api/alquileres/${selectedRental.id}/pagos`, {
-        method: "POST",
-        body: JSON.stringify({ ...formPago, monto: parseFloat(formPago.monto) }),
-      });
-      toast.success("Pago registrado");
-      setShowModal(false);
-      if (selectedClient) refreshClientDetail(selectedClient);
-    } catch (err: any) {
-      toast.error(err.message || "Error registrando pago");
     }
   };
 
@@ -543,7 +531,6 @@ function Rentals() {
       toast.success("Alquiler eliminado");
       setShowModal(false);
       await loadRentals();
-      // Si el cliente ya no tiene más alquileres, cerrar panel
       const remaining = rentals.filter(
         (r) => r.user_id === selectedClient && r.id !== selectedRental.id
       );
@@ -570,16 +557,14 @@ function Rentals() {
         dias: String(dias),
         fecha_fin: rental.fecha_fin.split("T")[0],
         precio: String(rental.precio),
-        divisa: "COP",
+        divisa: (rental as any).divisa || "COP",
         estado: rental.estado,
         notas: rental.notas || "",
       });
-      // Cargar correos del cliente para el dropdown de edición
       loadCorreos(String(rental.user_id));
     }
 
     if (type === "renovar") setFormDias("30");
-    if (type === "pago") setFormPago({ monto: "", divisa: "COP", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" });
     if (type === "garantia") setFormGarantia({ fecha_reporte: new Date().toISOString().split("T")[0], descripcion: "", cuenta_reemplazo: "", notas: "" });
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
@@ -682,7 +667,6 @@ function Rentals() {
                     <tr><td colSpan={6} className="empty-row">No hay alquileres</td></tr>
                   );
                 }
-                // Agrupar por fecha_fin
                 const grupos: { [fecha: string]: Rental[] } = {};
                 flatRows.forEach((r) => {
                   const key = r.fecha_fin.split("T")[0];
@@ -699,7 +683,6 @@ function Rentals() {
                       prev.includes(fecha) ? prev.filter(f => f !== fecha) : [...prev, fecha]
                     );
                     return [
-                      // Fila cabecera del grupo
                       <tr key={`grupo-${fecha}`} className="grupo-fecha-row" onClick={toggleGrupo}>
                         <td colSpan={6}>
                           <div className="grupo-fecha-header">
@@ -712,7 +695,6 @@ function Rentals() {
                           </div>
                         </td>
                       </tr>,
-                      // Filas de cuentas (solo si está abierto)
                       ...(isOpen ? rows.map((r) => {
                         const initials = r.cliente_nombre?.split(" ").map((w) => w[0]).join("").substring(0, 2) || "??";
                         const isSelected = selectedClient === r.user_id;
@@ -769,25 +751,40 @@ function Rentals() {
                 </h3>
                 <span className="detail-email">{clientInfo.cliente_email}</span>
               </div>
-              <div className="detail-tabs">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                {/* ── Botón resumen Telegram ── */}
                 <button
-                  className={activeTab === "cuentas" ? "active" : ""}
-                  onClick={() => setActiveTab("cuentas")}
+                  onClick={() => handleEnviarResumen(selectedClient)}
+                  disabled={enviandoResumen}
+                  title="Enviar resumen del cliente a Telegram"
+                  style={{
+                    background: "linear-gradient(135deg, #229ED9, #1a7fad)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "6px 12px",
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    cursor: enviandoResumen ? "not-allowed" : "pointer",
+                    opacity: enviandoResumen ? 0.6 : 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
                 >
-                  📦 Cuentas ({clientRentals.length})
+                  {enviandoResumen ? "Enviando..." : "📋 Resumen"}
                 </button>
-                <button
-                  className={activeTab === "pagos" ? "active" : ""}
-                  onClick={() => setActiveTab("pagos")}
-                >
-                  💳 Pagos ({pagos.length})
-                </button>
-                <button
-                  className={activeTab === "garantias" ? "active" : ""}
-                  onClick={() => setActiveTab("garantias")}
-                >
-                  🛡️ Garantías ({garantias.length})
-                </button>
+                <div className="detail-tabs">
+                  <button className={activeTab === "cuentas" ? "active" : ""} onClick={() => setActiveTab("cuentas")}>
+                    📦 Cuentas ({clientRentals.length})
+                  </button>
+                  <button className={activeTab === "pagos" ? "active" : ""} onClick={() => setActiveTab("pagos")}>
+                    💳 Pagos ({pagos.length})
+                  </button>
+                  <button className={activeTab === "garantias" ? "active" : ""} onClick={() => setActiveTab("garantias")}>
+                    🛡️ Garantías ({garantias.length})
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -819,7 +816,6 @@ function Rentals() {
                   )}
                 </div>
 
-                {/* Grupos por fecha de vencimiento */}
                 <div className="cuentas-scroll-list">
                   {(() => {
                     const grupos: { [fecha: string]: Rental[] } = {};
@@ -894,12 +890,15 @@ function Rentals() {
                                     {r.dias_restantes < 0 ? `${Math.abs(r.dias_restantes)}d vencido` : `${r.dias_restantes}d restantes`}
                                   </span>
                                   <span className={`pago-badge ${r.pago_estado || "sin-pago"}`}>{r.pago_estado || "sin pago"}</span>
-                                  {r.precio > 0 && <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>${Number(r.precio).toLocaleString("es-CO")}</span>}
+                                  {r.precio > 0 && (
+                                    <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>
+                                      ${Number(r.precio).toLocaleString("es-CO")} {r.divisa || "COP"}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="cuenta-actions">
                                   <button className="btn-icon editar" title="Editar" onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}>✏️</button>
                                   <button className="btn-icon renovar" title="Renovar" onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}>↻</button>
-                                  <button className="btn-icon pago" title="Pago" onClick={(e) => { e.stopPropagation(); openModal("pago", r); }}>💳</button>
                                   <button className="btn-icon garantia" title="Garantía" onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}>🛡️</button>
                                   <button className="btn-icon delete" title="Eliminar" onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}>✕</button>
                                 </div>
@@ -973,10 +972,7 @@ function Rentals() {
                         )}
                       </div>
                       {g.estado === "pendiente" && (
-                        <button
-                          className="btn-resolver"
-                          onClick={() => openModal("resolver", undefined, g)}
-                        >
+                        <button className="btn-resolver" onClick={() => openModal("resolver", undefined, g)}>
                           Resolver
                         </button>
                       )}
@@ -1023,17 +1019,10 @@ function Rentals() {
                         onClick={() => { setFormRental({ ...formRental, plataforma: p.nombre }); setShowNuevaPlataforma(false); }}
                       >
                         <span>{p.nombre}</span>
-                        <button
-                          className="plat-delete"
-                          title="Eliminar plataforma"
-                          onClick={(e) => { e.stopPropagation(); handleEliminarPlataforma(p); }}
-                        >🗑️</button>
+                        <button className="plat-delete" title="Eliminar plataforma" onClick={(e) => { e.stopPropagation(); handleEliminarPlataforma(p); }}>🗑️</button>
                       </div>
                     ))}
-                    <div
-                      className="plataforma-item agregar"
-                      onClick={() => setShowNuevaPlataforma(!showNuevaPlataforma)}
-                    >
+                    <div className="plataforma-item agregar" onClick={() => setShowNuevaPlataforma(!showNuevaPlataforma)}>
                       ➕ Agregar nueva plataforma...
                     </div>
                   </div>
@@ -1046,84 +1035,41 @@ function Rentals() {
 
                 {showNuevaPlataforma && (
                   <div className="nueva-plataforma-row">
-                    <input
-                      type="text"
-                      placeholder="Nombre de la nueva plataforma"
-                      value={nuevaPlataforma}
-                      onChange={(e) => setNuevaPlataforma(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()}
-                      autoFocus
-                    />
+                    <input type="text" placeholder="Nombre de la nueva plataforma" value={nuevaPlataforma} onChange={(e) => setNuevaPlataforma(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()} autoFocus />
                     <button className="btn-agregar-plat" onClick={handleAgregarPlataforma}>Agregar</button>
                   </div>
                 )}
 
                 <label>Fecha inicio *</label>
-                <input
-                  type="date"
-                  value={formRental.fecha_inicio}
-                  onChange={(e) => setFormRental({ ...formRental, fecha_inicio: e.target.value })}
-                />
+                <input type="date" value={formRental.fecha_inicio} onChange={(e) => setFormRental({ ...formRental, fecha_inicio: e.target.value })} />
 
                 <label>Días asignados *</label>
                 <div className="dias-quick">
                   {[7, 15, 30, 60].map((d) => (
-                    <button
-                      key={d}
-                      className={`dias-btn ${formRental.dias === String(d) ? "active" : ""}`}
-                      onClick={() => setFormRental({ ...formRental, dias: String(d) })}
-                    >
-                      {d}d
-                    </button>
+                    <button key={d} className={`dias-btn ${formRental.dias === String(d) ? "active" : ""}`} onClick={() => setFormRental({ ...formRental, dias: String(d) })}>{d}d</button>
                   ))}
                 </div>
-                <input
-                  type="number"
-                  placeholder="O escribe los días manualmente (ej: 1, 6, 90...)"
-                  value={formRental.dias}
-                  onChange={(e) => setFormRental({ ...formRental, dias: e.target.value })}
-                  min="1"
-                />
+                <input type="number" placeholder="O escribe los días manualmente" value={formRental.dias} onChange={(e) => setFormRental({ ...formRental, dias: e.target.value })} min="1" />
 
                 {formRental.fecha_inicio && formRental.dias && parseInt(formRental.dias) > 0 && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
-                    📅 Vence:{" "}
-                    {formatDate(addDays(formRental.fecha_inicio, parseInt(formRental.dias)))}{" "}
-                    — <strong>{formRental.dias} días</strong>
+                    📅 Vence: {formatDate(addDays(formRental.fecha_inicio, parseInt(formRental.dias)))} — <strong>{formRental.dias} días</strong>
                   </p>
                 )}
 
-                <input
-                  type="number"
-                  placeholder="Precio por cuenta"
-                  value={formRental.precio}
-                  onChange={(e) => setFormRental({ ...formRental, precio: e.target.value })}
-                />
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <select value={formRental.divisa} onChange={(e) => setFormRental({ ...formRental, divisa: e.target.value })} style={{ flex: 1 }}>
-                    <option value="COP">COP</option>
-                    <option value="USDT">USDT</option>
-                  </select>
-                </div>
+                <input type="number" placeholder="Precio por cuenta" value={formRental.precio} onChange={(e) => setFormRental({ ...formRental, precio: e.target.value })} />
+                <select value={formRental.divisa} onChange={(e) => setFormRental({ ...formRental, divisa: e.target.value })}>
+                  <option value="COP">COP</option>
+                  <option value="USDT">USDT</option>
+                </select>
 
                 <label>Organiza múltiples correos separados por <span style={{ color: "#a5b4fc", fontFamily: "monospace" }}>;</span></label>
-                <textarea
-                  rows={3}
-                  placeholder="correo1@gmail.com;correo2@gmail.com;correo3@gmail.com"
-                  value={bulkInput}
-                  onChange={(e) => {
-                    setBulkInput(e.target.value);
-                    parseBulkCorreos(e.target.value);
-                  }}
-                  style={{ fontFamily: "monospace", fontSize: "0.82rem" }}
-                />
+                <textarea rows={3} placeholder="correo1@gmail.com;correo2@gmail.com" value={bulkInput} onChange={(e) => { setBulkInput(e.target.value); parseBulkCorreos(e.target.value); }} style={{ fontFamily: "monospace", fontSize: "0.82rem" }} />
 
                 {bulkCorreos.length > 0 && (
                   <div className="bulk-preview">
                     <div className="bulk-preview-header">
-                      <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)" }}>
-                        Cuentas detectadas
-                      </span>
+                      <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)" }}>Cuentas detectadas</span>
                       <span className="bulk-count">{bulkCorreos.length} cuenta{bulkCorreos.length > 1 ? "s" : ""}</span>
                     </div>
                     <div className="bulk-list">
@@ -1135,7 +1081,7 @@ function Rentals() {
                       ))}
                     </div>
                     <p style={{ margin: 0, fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>
-                      Se crearán {bulkCorreos.length} alquileres individuales — cada uno editable y con garantía propia
+                      Se crearán {bulkCorreos.length} alquileres individuales
                     </p>
                   </div>
                 )}
@@ -1144,37 +1090,21 @@ function Rentals() {
                   <>
                     <label>O selecciona un correo individual</label>
                     {correosDisponibles.length > 0 ? (
-                      <select
-                        value={formRental.correo}
-                        onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
-                      >
+                      <select value={formRental.correo} onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}>
                         <option value="">Sin correo asignado</option>
-                        {correosDisponibles.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
+                        {correosDisponibles.map((c) => (<option key={c} value={c}>{c}</option>))}
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        placeholder="correo@ejemplo.com (opcional)"
-                        value={formRental.correo}
-                        onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })}
-                      />
+                      <input type="text" placeholder="correo@ejemplo.com (opcional)" value={formRental.correo} onChange={(e) => setFormRental({ ...formRental, correo: e.target.value })} />
                     )}
                   </>
                 )}
 
-                <textarea
-                  placeholder="Notas (opcional)"
-                  value={formRental.notas}
-                  onChange={(e) => setFormRental({ ...formRental, notas: e.target.value })}
-                />
+                <textarea placeholder="Notas (opcional)" value={formRental.notas} onChange={(e) => setFormRental({ ...formRental, notas: e.target.value })} />
 
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleCreateRental}>
-                    {bulkCorreos.length > 1
-                      ? `Crear ${bulkCorreos.length} alquileres`
-                      : "Crear alquiler"}
+                    {bulkCorreos.length > 1 ? `Crear ${bulkCorreos.length} alquileres` : "Crear alquiler"}
                   </button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
@@ -1185,127 +1115,61 @@ function Rentals() {
             {modalType === "editar" && selectedRental && (
               <>
                 <h3>✏️ Editar Alquiler</h3>
-                <p className="modal-subtitle">
-                  {selectedRental.cliente_nombre} — ID #{selectedRental.id}
-                </p>
+                <p className="modal-subtitle">{selectedRental.cliente_nombre} — ID #{selectedRental.id}</p>
                 <label>Plataforma *</label>
                 <div className="plataforma-selector">
                   <div className="plataforma-lista">
                     {plataformas.map((p) => (
-                      <div
-                        key={p.id}
-                        className={`plataforma-item ${formEditar.plataforma === p.nombre ? "selected" : ""}`}
-                        onClick={() => { setFormEditar({ ...formEditar, plataforma: p.nombre }); setShowNuevaPlataforma(false); }}
-                      >
+                      <div key={p.id} className={`plataforma-item ${formEditar.plataforma === p.nombre ? "selected" : ""}`} onClick={() => { setFormEditar({ ...formEditar, plataforma: p.nombre }); setShowNuevaPlataforma(false); }}>
                         <span>{p.nombre}</span>
-                        <button
-                          className="plat-delete"
-                          title="Eliminar plataforma"
-                          onClick={(e) => { e.stopPropagation(); handleEliminarPlataforma(p); }}
-                        >🗑️</button>
+                        <button className="plat-delete" title="Eliminar plataforma" onClick={(e) => { e.stopPropagation(); handleEliminarPlataforma(p); }}>🗑️</button>
                       </div>
                     ))}
-                    <div
-                      className="plataforma-item agregar"
-                      onClick={() => setShowNuevaPlataforma(!showNuevaPlataforma)}
-                    >
-                      ➕ Agregar nueva plataforma...
-                    </div>
+                    <div className="plataforma-item agregar" onClick={() => setShowNuevaPlataforma(!showNuevaPlataforma)}>➕ Agregar nueva plataforma...</div>
                   </div>
-                  {formEditar.plataforma && (
-                    <div className="plataforma-selected-label">
-                      Seleccionada: <strong>{formEditar.plataforma}</strong>
-                    </div>
-                  )}
+                  {formEditar.plataforma && <div className="plataforma-selected-label">Seleccionada: <strong>{formEditar.plataforma}</strong></div>}
                 </div>
-
                 {showNuevaPlataforma && (
                   <div className="nueva-plataforma-row">
-                    <input
-                      type="text"
-                      placeholder="Nombre de la nueva plataforma"
-                      value={nuevaPlataforma}
-                      onChange={(e) => setNuevaPlataforma(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()}
-                      autoFocus
-                    />
+                    <input type="text" placeholder="Nombre de la nueva plataforma" value={nuevaPlataforma} onChange={(e) => setNuevaPlataforma(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()} autoFocus />
                     <button className="btn-agregar-plat" onClick={handleAgregarPlataforma}>Agregar</button>
                   </div>
                 )}
                 <label>Correo de la cuenta</label>
                 {correosDisponibles.length > 0 ? (
-                  <select
-                    value={formEditar.correo}
-                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
-                  >
+                  <select value={formEditar.correo} onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}>
                     <option value="">Sin correo asignado</option>
-                    {correosDisponibles.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                    {correosDisponibles.map((c) => (<option key={c} value={c}>{c}</option>))}
                   </select>
                 ) : (
-                  <input
-                    type="text"
-                    placeholder="Correo de la cuenta (opcional)"
-                    value={formEditar.correo}
-                    onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })}
-                  />
+                  <input type="text" placeholder="Correo de la cuenta (opcional)" value={formEditar.correo} onChange={(e) => setFormEditar({ ...formEditar, correo: e.target.value })} />
                 )}
                 <label>Fecha inicio *</label>
-                <input
-                  type="date"
-                  value={formEditar.fecha_inicio}
-                  onChange={(e) => setFormEditar({ ...formEditar, fecha_inicio: e.target.value })}
-                />
+                <input type="date" value={formEditar.fecha_inicio} onChange={(e) => setFormEditar({ ...formEditar, fecha_inicio: e.target.value })} />
                 <label>Días asignados *</label>
                 <div className="dias-quick">
                   {[7, 15, 30, 60].map((d) => (
-                    <button
-                      key={d}
-                      className={`dias-btn ${formEditar.dias === String(d) ? "active" : ""}`}
-                      onClick={() => setFormEditar({ ...formEditar, dias: String(d) })}
-                    >
-                      {d}d
-                    </button>
+                    <button key={d} className={`dias-btn ${formEditar.dias === String(d) ? "active" : ""}`} onClick={() => setFormEditar({ ...formEditar, dias: String(d) })}>{d}d</button>
                   ))}
                 </div>
-                <input
-                  type="number"
-                  placeholder="Días"
-                  value={formEditar.dias}
-                  onChange={(e) => setFormEditar({ ...formEditar, dias: e.target.value })}
-                  min="1"
-                />
+                <input type="number" placeholder="Días" value={formEditar.dias} onChange={(e) => setFormEditar({ ...formEditar, dias: e.target.value })} min="1" />
                 {formEditar.fecha_inicio && formEditar.dias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
-                    📅 Vence:{" "}
-                    {formatDate(addDays(formEditar.fecha_inicio, parseInt(formEditar.dias) || 0))}
+                    📅 Vence: {formatDate(addDays(formEditar.fecha_inicio, parseInt(formEditar.dias) || 0))}
                   </p>
                 )}
-                <input
-                  type="number"
-                  placeholder="Precio"
-                  value={formEditar.precio}
-                  onChange={(e) => setFormEditar({ ...formEditar, precio: e.target.value })}
-                />
+                <input type="number" placeholder="Precio" value={formEditar.precio} onChange={(e) => setFormEditar({ ...formEditar, precio: e.target.value })} />
                 <select value={formEditar.divisa} onChange={(e) => setFormEditar({ ...formEditar, divisa: e.target.value })}>
                   <option value="COP">COP</option>
                   <option value="USDT">USDT</option>
                 </select>
                 <label>Estado</label>
-                <select
-                  value={formEditar.estado}
-                  onChange={(e) => setFormEditar({ ...formEditar, estado: e.target.value })}
-                >
+                <select value={formEditar.estado} onChange={(e) => setFormEditar({ ...formEditar, estado: e.target.value })}>
                   <option value="activo">Activo</option>
                   <option value="vencido">Vencido</option>
                   <option value="cancelado">Cancelado</option>
                 </select>
-                <textarea
-                  placeholder="Notas (opcional)"
-                  value={formEditar.notas}
-                  onChange={(e) => setFormEditar({ ...formEditar, notas: e.target.value })}
-                />
+                <textarea placeholder="Notas (opcional)" value={formEditar.notas} onChange={(e) => setFormEditar({ ...formEditar, notas: e.target.value })} />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleEditarRental}>Guardar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1326,78 +1190,17 @@ function Rentals() {
                 <label>Días a extender</label>
                 <div className="dias-quick">
                   {[7, 15, 30, 60].map((d) => (
-                    <button
-                      key={d}
-                      className={`dias-btn ${formDias === String(d) ? "active" : ""}`}
-                      onClick={() => setFormDias(String(d))}
-                    >
-                      {d}d
-                    </button>
+                    <button key={d} className={`dias-btn ${formDias === String(d) ? "active" : ""}`} onClick={() => setFormDias(String(d))}>{d}d</button>
                   ))}
                 </div>
-                <input
-                  type="number"
-                  value={formDias}
-                  onChange={(e) => setFormDias(e.target.value)}
-                  min="1"
-                />
+                <input type="number" value={formDias} onChange={(e) => setFormDias(e.target.value)} min="1" />
                 {selectedRental && formDias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
-                    📅 Nueva fecha fin:{" "}
-                    {formatDate(addDays(selectedRental.fecha_fin, parseInt(formDias) || 0))}
+                    📅 Nueva fecha fin: {formatDate(addDays(selectedRental.fecha_fin, parseInt(formDias) || 0))}
                   </p>
                 )}
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRenovar}>Renovar</button>
-                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                </div>
-              </>
-            )}
-
-            {/* MODAL PAGO */}
-            {modalType === "pago" && (
-              <>
-                <h3>Registrar Pago</h3>
-                <p className="modal-subtitle">
-                  {selectedRental?.plataforma}
-                  {selectedRental?.correo && ` — ${selectedRental.correo}`}
-                </p>
-                <input
-                  type="number"
-                  placeholder="Monto (COP) *"
-                  value={formPago.monto}
-                  onChange={(e) => setFormPago({ ...formPago, monto: e.target.value })}
-                />
-                <label>Fecha de pago</label>
-                <input
-                  type="date"
-                  value={formPago.fecha_pago}
-                  onChange={(e) => setFormPago({ ...formPago, fecha_pago: e.target.value })}
-                />
-                <select value={formPago.estado} onChange={(e) => setFormPago({ ...formPago, estado: e.target.value })}>
-                  <option value="pagado">Pagado</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="vencido">Vencido</option>
-                </select>
-                <label>Divisa</label>
-                <select value={formPago.divisa} onChange={(e) => setFormPago({ ...formPago, divisa: e.target.value })}>
-                  <option value="COP">COP — Peso colombiano</option>
-                  <option value="USDT">USDT — Dólar</option>
-                </select>
-                <label>Método de pago</label>
-                <select value={formPago.metodo} onChange={(e) => { if (e.target.value === "__nuevo__") { setShowNuevoMetodo(true); } else { setFormPago({ ...formPago, metodo: e.target.value }); setShowNuevoMetodo(false); } }}>
-                  {metodosPago.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
-                  <option value="__nuevo__">➕ Agregar método...</option>
-                </select>
-                {showNuevoMetodo && (
-                  <div className="nueva-plataforma-row">
-                    <input type="text" placeholder="Nombre del método" value={nuevoMetodo} onChange={(e) => setNuevoMetodo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAgregarMetodo()} autoFocus />
-                    <button className="btn-agregar-plat" onClick={handleAgregarMetodo}>Agregar</button>
-                  </div>
-                )}
-                <textarea placeholder="Notas (opcional)" value={formPago.notas} onChange={(e) => setFormPago({ ...formPago, notas: e.target.value })} />
-                <div className="modal-actions">
-                  <button className="btn-primary" onClick={handleRegistrarPago}>Registrar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
@@ -1409,31 +1212,13 @@ function Rentals() {
                 <h3>Registrar Garantía</h3>
                 <p className="modal-subtitle">
                   {selectedRental?.plataforma}
-                  {selectedRental?.correo && (
-                    <span style={{ color: "#a5b4fc" }}> — {selectedRental.correo}</span>
-                  )}
+                  {selectedRental?.correo && (<span style={{ color: "#a5b4fc" }}> — {selectedRental.correo}</span>)}
                 </p>
                 <label>Fecha de reporte</label>
-                <input
-                  type="date"
-                  value={formGarantia.fecha_reporte}
-                  onChange={(e) => setFormGarantia({ ...formGarantia, fecha_reporte: e.target.value })}
-                />
-                <textarea
-                  placeholder="Descripción del problema *"
-                  value={formGarantia.descripcion}
-                  onChange={(e) => setFormGarantia({ ...formGarantia, descripcion: e.target.value })}
-                />
-                <input
-                  placeholder="Cuenta de reemplazo (opcional)"
-                  value={formGarantia.cuenta_reemplazo}
-                  onChange={(e) => setFormGarantia({ ...formGarantia, cuenta_reemplazo: e.target.value })}
-                />
-                <textarea
-                  placeholder="Notas (opcional)"
-                  value={formGarantia.notas}
-                  onChange={(e) => setFormGarantia({ ...formGarantia, notas: e.target.value })}
-                />
+                <input type="date" value={formGarantia.fecha_reporte} onChange={(e) => setFormGarantia({ ...formGarantia, fecha_reporte: e.target.value })} />
+                <textarea placeholder="Descripción del problema *" value={formGarantia.descripcion} onChange={(e) => setFormGarantia({ ...formGarantia, descripcion: e.target.value })} />
+                <input placeholder="Cuenta de reemplazo (opcional)" value={formGarantia.cuenta_reemplazo} onChange={(e) => setFormGarantia({ ...formGarantia, cuenta_reemplazo: e.target.value })} />
+                <textarea placeholder="Notas (opcional)" value={formGarantia.notas} onChange={(e) => setFormGarantia({ ...formGarantia, notas: e.target.value })} />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRegistrarGarantia}>Registrar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1446,16 +1231,8 @@ function Rentals() {
               <>
                 <h3>Resolver Garantía</h3>
                 <p className="modal-subtitle">{modalData?.descripcion}</p>
-                <input
-                  placeholder="Cuenta de reemplazo suministrada"
-                  value={formResolver.cuenta_reemplazo}
-                  onChange={(e) => setFormResolver({ ...formResolver, cuenta_reemplazo: e.target.value })}
-                />
-                <textarea
-                  placeholder="Notas de resolución"
-                  value={formResolver.notas}
-                  onChange={(e) => setFormResolver({ ...formResolver, notas: e.target.value })}
-                />
+                <input placeholder="Cuenta de reemplazo suministrada" value={formResolver.cuenta_reemplazo} onChange={(e) => setFormResolver({ ...formResolver, cuenta_reemplazo: e.target.value })} />
+                <textarea placeholder="Notas de resolución" value={formResolver.notas} onChange={(e) => setFormResolver({ ...formResolver, notas: e.target.value })} />
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleResolverGarantia}>Resolver</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1471,9 +1248,7 @@ function Rentals() {
                   Se eliminarán {selectedCuentas.length} cuenta(s) con todos sus pagos y garantías. Esta acción no se puede deshacer.
                 </p>
                 <div className="modal-actions">
-                  <button className="btn-danger" onClick={handleEliminarMasivo}>
-                    Eliminar {selectedCuentas.length} cuenta(s)
-                  </button>
+                  <button className="btn-danger" onClick={handleEliminarMasivo}>Eliminar {selectedCuentas.length} cuenta(s)</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
@@ -1484,13 +1259,7 @@ function Rentals() {
               <>
                 <h3>💳 Pago masivo</h3>
                 <p className="modal-subtitle">{selectedCuentas.length} cuenta(s) seleccionada(s)</p>
-                <input
-                  type="number"
-                  placeholder="Monto (COP) *"
-                  value={formPagoMasivo.monto}
-                  onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, monto: e.target.value })}
-                  min="0"
-                />
+                <input type="number" placeholder="Monto *" value={formPagoMasivo.monto} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, monto: e.target.value })} min="0" />
                 <label>Divisa</label>
                 <select value={formPagoMasivo.divisa} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, divisa: e.target.value })}>
                   <option value="COP">COP — Peso colombiano</option>
@@ -1516,9 +1285,7 @@ function Rentals() {
                 )}
                 <textarea placeholder="Notas (opcional)" value={formPagoMasivo.notas} onChange={(e) => setFormPagoMasivo({ ...formPagoMasivo, notas: e.target.value })} />
                 <div className="modal-actions">
-                  <button className="btn-primary" onClick={handlePagoMasivo}>
-                    Registrar {selectedCuentas.length} pago(s)
-                  </button>
+                  <button className="btn-primary" onClick={handlePagoMasivo}>Registrar {selectedCuentas.length} pago(s)</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
@@ -1530,8 +1297,7 @@ function Rentals() {
                 <h3>¿Eliminar alquiler?</h3>
                 <p className="modal-subtitle">
                   Se eliminará {selectedRental?.plataforma}
-                  {selectedRental?.correo && ` (${selectedRental.correo})`} y todos sus pagos y
-                  garantías. Esta acción no se puede deshacer.
+                  {selectedRental?.correo && ` (${selectedRental.correo})`} y todos sus pagos y garantías. Esta acción no se puede deshacer.
                 </p>
                 <div className="modal-actions">
                   <button className="btn-danger" onClick={handleDeleteRental}>Eliminar</button>
