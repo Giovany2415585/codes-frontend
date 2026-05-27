@@ -129,21 +129,16 @@ function Users() {
     return matchesSearch && matchesTag;
   });
 
-const filteredEmailIds = new Set(filteredEmails.map((e) => e.id));
-const allSelected = filteredEmails.length > 0 && filteredEmails.every((e) => e.selected);
-const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
-const selectedEmailAddresses = authorizedEmails.filter((e) => e.selected).map((e) => e.email);
-
-const toggleSelectAll = () => {
-  setAuthorizedEmails((prev) =>
-    prev.map((e) =>
-      filteredEmailIds.has(e.id) ? { ...e, selected: !allSelected } : e
-    )
-  );
-};
+  const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
+  const selectedEmailAddresses = authorizedEmails.filter((e) => e.selected).map((e) => e.email);
+  const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
 
   const toggleSelectEmail = (id: number) => {
     setAuthorizedEmails((prev) => prev.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
+  };
+
+  const toggleSelectAll = () => {
+    setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: !allSelected })));
   };
 
   useEffect(() => {
@@ -260,9 +255,11 @@ const toggleSelectAll = () => {
   const handleDeleteSelectedEmails = async () => {
     if (!selectedUser || selectedEmailIds.length === 0) return;
     try {
-      for (const id of selectedEmailIds) {
-        await apiFetch(`/api/admin/authorized-emails/${id}`, { method: "DELETE" });
-      }
+      // Bulk delete — una sola notificación Telegram
+      await apiFetch("/api/admin/authorized-emails/bulk-delete", {
+        method: "DELETE",
+        body: JSON.stringify({ authorized_email_ids: selectedEmailIds }),
+      });
       toast.success(`${selectedEmailIds.length} correo(s) eliminado(s)`);
       const data = await apiFetch(`/api/admin/users/${selectedUser.id}/authorized-emails`);
       setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
@@ -600,20 +597,20 @@ const toggleSelectAll = () => {
     const correosSeleccionados = selectedEmailAddresses;
 
     try {
-      for (const correo of correosSeleccionados) {
-        await apiFetch("/api/alquileres", {
-          method: "POST",
-          body: JSON.stringify({
-            user_id: selectedUser.id,
-            plataforma: formAlquilerRapido.plataforma,
-            correo,
-            fecha_inicio: formAlquilerRapido.fecha_inicio,
-            fecha_fin,
-            precio: parseFloat(formAlquilerRapido.precio) || 0,
-            notas: formAlquilerRapido.notas || null,
-          }),
-        });
-      }
+      // Siempre bulk — una sola notificación Telegram
+      await apiFetch("/api/alquileres/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          plataforma: formAlquilerRapido.plataforma,
+          correos: correosSeleccionados,
+          fecha_inicio: formAlquilerRapido.fecha_inicio,
+          fecha_fin,
+          precio: parseFloat(formAlquilerRapido.precio) || 0,
+          divisa: formAlquilerRapido.divisa || "COP",
+          notas: formAlquilerRapido.notas || null,
+        }),
+      });
       const total = correosSeleccionados.length;
       toast.success(
         total > 1
@@ -621,7 +618,6 @@ const toggleSelectAll = () => {
           : `✅ Alquiler creado para ${selectedUser.first_name}`
       );
       setShowModal(false);
-      // Deseleccionar correos tras crear
       setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: false })));
     } catch (err: any) {
       toast.error(err.message || "Error creando alquiler");
