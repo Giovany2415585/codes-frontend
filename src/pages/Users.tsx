@@ -45,6 +45,29 @@ interface DangerousSubject {
   name: string;
 }
 
+interface Plataforma {
+  id: number;
+  nombre: string;
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function addDays(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("T")[0].split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString("es-CO");
+}
+
 function Users() {
   const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
@@ -67,7 +90,7 @@ function Users() {
   const [newSubject, setNewSubject] = useState("");
   const [bulkSubjectName, setBulkSubjectName] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<"edit" | "delete" | "deleteAllEmails" | "deleteSelected" | null>(null);
+  const [modalType, setModalType] = useState<"edit" | "delete" | "deleteAllEmails" | "deleteSelected" | "crearAlquiler" | null>(null);
   const [modalEntity, setModalEntity] = useState<"user" | "email" | "subject" | null>(null);
   const [subjectFile, setSubjectFile] = useState<File | null>(null);
   const subjectFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,6 +105,19 @@ function Users() {
   const [newTagColor, setNewTagColor] = useState("#6366f1");
   const [showTagManager, setShowTagManager] = useState(false);
 
+  // ── Estado para alquiler rápido ─────────────────────────────────────────────
+  const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
+  const [formAlquilerRapido, setFormAlquilerRapido] = useState({
+    plataforma: "",
+    fecha_inicio: new Date().toISOString().split("T")[0],
+    dias: "30",
+    precio: "",
+    divisa: "COP",
+    notas: "",
+  });
+  const [nuevaPlataformaRapida, setNuevaPlataformaRapida] = useState("");
+  const [showNuevaPlataformaRapida, setShowNuevaPlataformaRapida] = useState(false);
+
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -93,15 +129,21 @@ function Users() {
     return matchesSearch && matchesTag;
   });
 
-  const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
-  const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
+const filteredEmailIds = new Set(filteredEmails.map((e) => e.id));
+const allSelected = filteredEmails.length > 0 && filteredEmails.every((e) => e.selected);
+const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
+const selectedEmailAddresses = authorizedEmails.filter((e) => e.selected).map((e) => e.email);
+
+const toggleSelectAll = () => {
+  setAuthorizedEmails((prev) =>
+    prev.map((e) =>
+      filteredEmailIds.has(e.id) ? { ...e, selected: !allSelected } : e
+    )
+  );
+};
 
   const toggleSelectEmail = (id: number) => {
     setAuthorizedEmails((prev) => prev.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
-  };
-
-  const toggleSelectAll = () => {
-    setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: !allSelected })));
   };
 
   useEffect(() => {
@@ -109,7 +151,17 @@ function Users() {
     loadSavedSubjects();
     loadDangerousSubjects();
     loadEmailTags();
+    loadPlataformas();
   }, []);
+
+  const loadPlataformas = async () => {
+    try {
+      const data = await apiFetch("/api/alquileres/plataformas");
+      setPlataformas(data);
+    } catch {
+      // fallback silencioso
+    }
+  };
 
   const loadEmailTags = async () => {
     try {
@@ -164,6 +216,7 @@ function Users() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (showModal) { setShowModal(false); return; }
         if (selectedEmail) {
           setSelectedEmail(null);
           setSubjects([]);
@@ -181,7 +234,7 @@ function Users() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedUser, selectedEmail]);
+  }, [selectedUser, selectedEmail, showModal]);
 
   const handleSelectUser = async (u: User) => {
     if (selectedUser?.id === u.id) {
@@ -503,6 +556,78 @@ function Users() {
     }
   };
 
+  // ── Alquiler rápido ──────────────────────────────────────────────────────────
+  const openModalAlquilerRapido = () => {
+    setFormAlquilerRapido({
+      plataforma: "",
+      fecha_inicio: new Date().toISOString().split("T")[0],
+      dias: "30",
+      precio: "",
+      divisa: "COP",
+      notas: "",
+    });
+    setNuevaPlataformaRapida("");
+    setShowNuevaPlataformaRapida(false);
+    setModalType("crearAlquiler");
+    setShowModal(true);
+  };
+
+  const handleAgregarPlataformaRapida = async () => {
+    if (!nuevaPlataformaRapida.trim()) return;
+    try {
+      await apiFetch("/api/alquileres/plataformas", {
+        method: "POST",
+        body: JSON.stringify({ nombre: nuevaPlataformaRapida.trim() }),
+      });
+      toast.success(`Plataforma "${nuevaPlataformaRapida.trim()}" agregada`);
+      setFormAlquilerRapido({ ...formAlquilerRapido, plataforma: nuevaPlataformaRapida.trim() });
+      setNuevaPlataformaRapida("");
+      setShowNuevaPlataformaRapida(false);
+      await loadPlataformas();
+    } catch (err: any) {
+      toast.error(err.message || "Error agregando plataforma");
+    }
+  };
+
+  const handleCrearAlquilerRapido = async () => {
+    if (!selectedUser) { toast.error("Selecciona un cliente primero"); return; }
+    if (!formAlquilerRapido.plataforma) { toast.error("Selecciona una plataforma"); return; }
+    if (!formAlquilerRapido.fecha_inicio) { toast.error("Indica la fecha de inicio"); return; }
+    if (!formAlquilerRapido.dias || parseInt(formAlquilerRapido.dias) < 1) { toast.error("Días inválidos"); return; }
+    if (selectedEmailIds.length === 0) { toast.error("Selecciona al menos un correo"); return; }
+
+    const fecha_fin = addDays(formAlquilerRapido.fecha_inicio, parseInt(formAlquilerRapido.dias));
+    const correosSeleccionados = selectedEmailAddresses;
+
+    try {
+      for (const correo of correosSeleccionados) {
+        await apiFetch("/api/alquileres", {
+          method: "POST",
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            plataforma: formAlquilerRapido.plataforma,
+            correo,
+            fecha_inicio: formAlquilerRapido.fecha_inicio,
+            fecha_fin,
+            precio: parseFloat(formAlquilerRapido.precio) || 0,
+            notas: formAlquilerRapido.notas || null,
+          }),
+        });
+      }
+      const total = correosSeleccionados.length;
+      toast.success(
+        total > 1
+          ? `✅ ${total} alquileres creados para ${selectedUser.first_name}`
+          : `✅ Alquiler creado para ${selectedUser.first_name}`
+      );
+      setShowModal(false);
+      // Deseleccionar correos tras crear
+      setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: false })));
+    } catch (err: any) {
+      toast.error(err.message || "Error creando alquiler");
+    }
+  };
+
   const openEditModal = (entity: "user" | "email" | "subject", data: any) => {
     setModalType("edit");
     setModalEntity(entity);
@@ -612,19 +737,43 @@ function Users() {
               <h3>{t("users.authorizedEmails")}</h3>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {selectedEmailIds.length > 0 && (
-                  <button className="btn-danger-small" onClick={() => { setModalType("deleteSelected"); setShowModal(true); }}>
-                    🗑 Eliminar {selectedEmailIds.length} seleccionado(s)
-                  </button>
-                )}
-                {selectedEmailIds.length > 0 && (
-                  <button className="btn-danger-small" onClick={() => { setModalType("clearSubjects" as any); setShowModal(true); }}>
-                    🧹 Quitar asuntos de {selectedEmailIds.length} seleccionado(s)
-                  </button>
-                )}
-                {selectedEmailIds.length > 0 && authorizedEmails.filter(e => selectedEmailIds.includes(e.id) && e.tag_id).length > 0 && (
-                  <button className="btn-danger-small" onClick={handleRemoveTagFromSelected}>
-                    🏷️ Quitar etiqueta de {selectedEmailIds.length} seleccionado(s)
-                  </button>
+                  <>
+                    {/* ── Botón Crear alquiler rápido ── */}
+                    <button
+                      className="btn-create-rental"
+                      onClick={openModalAlquilerRapido}
+                      title={`Crear alquiler con ${selectedEmailIds.length} correo(s) seleccionado(s)`}
+                      style={{
+                        background: "linear-gradient(135deg, #6c63ff, #4f46e5)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "6px 12px",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        boxShadow: "0 2px 8px rgba(108,99,255,0.35)",
+                        transition: "opacity 0.15s",
+                      }}
+                    >
+                      🎬 Crear alquiler ({selectedEmailIds.length})
+                    </button>
+
+                    <button className="btn-danger-small" onClick={() => { setModalType("deleteSelected"); setShowModal(true); }}>
+                      🗑 Eliminar {selectedEmailIds.length} seleccionado(s)
+                    </button>
+                    <button className="btn-danger-small" onClick={() => { setModalType("clearSubjects" as any); setShowModal(true); }}>
+                      🧹 Quitar asuntos de {selectedEmailIds.length} seleccionado(s)
+                    </button>
+                    {authorizedEmails.filter(e => selectedEmailIds.includes(e.id) && e.tag_id).length > 0 && (
+                      <button className="btn-danger-small" onClick={handleRemoveTagFromSelected}>
+                        🏷️ Quitar etiqueta de {selectedEmailIds.length} seleccionado(s)
+                      </button>
+                    )}
+                  </>
                 )}
                 {selectedUser && authorizedEmails.length > 0 && (
                   <button className="btn-danger-small" onClick={() => { setModalType("deleteAllEmails"); setShowModal(true); }}>
@@ -930,6 +1079,239 @@ function Users() {
                 </p>
                 <button onClick={handleClearSubjectsFromSelected}>Quitar asuntos</button>
                 <button onClick={() => setShowModal(false)}>Cancelar</button>
+              </>
+            )}
+
+            {/* ── MODAL CREAR ALQUILER RÁPIDO ─────────────────────────────── */}
+            {modalType === "crearAlquiler" && selectedUser && (
+              <>
+                <h3>🎬 Crear alquiler</h3>
+                <p style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.5)", margin: "0 0 12px" }}>
+                  Cliente: <strong style={{ color: "#a5b4fc" }}>{selectedUser.first_name}</strong>
+                  {" · "}
+                  {selectedEmailIds.length} correo{selectedEmailIds.length > 1 ? "s" : ""} seleccionado{selectedEmailIds.length > 1 ? "s" : ""}
+                </p>
+
+                {/* Vista previa de correos que se van a asignar */}
+                <div style={{
+                  background: "rgba(108,99,255,0.1)",
+                  border: "1px solid rgba(108,99,255,0.3)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  marginBottom: 14,
+                  maxHeight: 120,
+                  overflowY: "auto",
+                }}>
+                  {selectedEmailAddresses.map((c) => (
+                    <div key={c} style={{ fontSize: "0.78rem", color: "#c4b5fd", padding: "2px 0", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "#6c63ff" }}>📧</span> {c}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Plataforma */}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Plataforma *
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                  {plataformas.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setFormAlquilerRapido({ ...formAlquilerRapido, plataforma: p.nombre });
+                        setShowNuevaPlataformaRapida(false);
+                      }}
+                      style={{
+                        padding: "4px 12px",
+                        borderRadius: 20,
+                        border: `1px solid ${formAlquilerRapido.plataforma === p.nombre ? "#6c63ff" : "rgba(255,255,255,0.15)"}`,
+                        background: formAlquilerRapido.plataforma === p.nombre ? "rgba(108,99,255,0.3)" : "transparent",
+                        color: formAlquilerRapido.plataforma === p.nombre ? "#a5b4fc" : "rgba(255,255,255,0.6)",
+                        fontSize: "0.78rem",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {p.nombre}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowNuevaPlataformaRapida(!showNuevaPlataformaRapida)}
+                    style={{
+                      padding: "4px 12px",
+                      borderRadius: 20,
+                      border: "1px dashed rgba(255,255,255,0.2)",
+                      background: "transparent",
+                      color: "rgba(255,255,255,0.4)",
+                      fontSize: "0.78rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ➕ Nueva
+                  </button>
+                </div>
+
+                {showNuevaPlataformaRapida && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                    <input
+                      type="text"
+                      placeholder="Nombre de la plataforma"
+                      value={nuevaPlataformaRapida}
+                      onChange={(e) => setNuevaPlataformaRapida(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataformaRapida()}
+                      autoFocus
+                      style={{
+                        flex: 1, padding: "6px 10px", borderRadius: 6,
+                        background: "rgba(255,255,255,0.06)", color: "white",
+                        border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.82rem",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAgregarPlataformaRapida}
+                      style={{
+                        padding: "6px 14px", borderRadius: 6, border: "none",
+                        background: "#4f46e5", color: "white", cursor: "pointer", fontSize: "0.82rem",
+                      }}
+                    >
+                      Agregar
+                    </button>
+                  </div>
+                )}
+
+                {formAlquilerRapido.plataforma && (
+                  <p style={{ fontSize: "0.75rem", color: "#a5b4fc", marginBottom: 10 }}>
+                    ✅ Plataforma: <strong>{formAlquilerRapido.plataforma}</strong>
+                  </p>
+                )}
+
+                {/* Fecha inicio */}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Fecha inicio *
+                </label>
+                <input
+                  type="date"
+                  value={formAlquilerRapido.fecha_inicio}
+                  onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, fecha_inicio: e.target.value })}
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 6, marginBottom: 10,
+                    background: "rgba(255,255,255,0.06)", color: "white",
+                    border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                    boxSizing: "border-box",
+                  }}
+                />
+
+                {/* Días */}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Días asignados *
+                </label>
+                <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                  {[7, 15, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setFormAlquilerRapido({ ...formAlquilerRapido, dias: String(d) })}
+                      style={{
+                        flex: 1, padding: "6px 0", borderRadius: 6,
+                        border: `1px solid ${formAlquilerRapido.dias === String(d) ? "#6c63ff" : "rgba(255,255,255,0.15)"}`,
+                        background: formAlquilerRapido.dias === String(d) ? "rgba(108,99,255,0.3)" : "transparent",
+                        color: formAlquilerRapido.dias === String(d) ? "#a5b4fc" : "rgba(255,255,255,0.6)",
+                        fontSize: "0.82rem", cursor: "pointer",
+                      }}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  placeholder="O escribe los días manualmente"
+                  value={formAlquilerRapido.dias}
+                  onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, dias: e.target.value })}
+                  min="1"
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 6, marginBottom: 6,
+                    background: "rgba(255,255,255,0.06)", color: "white",
+                    border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                    boxSizing: "border-box",
+                  }}
+                />
+
+                {formAlquilerRapido.fecha_inicio && formAlquilerRapido.dias && parseInt(formAlquilerRapido.dias) > 0 && (
+                  <p style={{ fontSize: "0.75rem", color: "#a5b4fc", marginBottom: 10 }}>
+                    📅 Vence: <strong>{formatDate(addDays(formAlquilerRapido.fecha_inicio, parseInt(formAlquilerRapido.dias)))}</strong>
+                    {" · "}{formAlquilerRapido.dias} días
+                  </p>
+                )}
+
+                {/* Precio y divisa */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                  <input
+                    type="number"
+                    placeholder="Precio por cuenta"
+                    value={formAlquilerRapido.precio}
+                    onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, precio: e.target.value })}
+                    style={{
+                      flex: 1, padding: "8px 10px", borderRadius: 6,
+                      background: "rgba(255,255,255,0.06)", color: "white",
+                      border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                    }}
+                  />
+                  <select
+                    value={formAlquilerRapido.divisa}
+                    onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, divisa: e.target.value })}
+                    style={{
+                      padding: "8px 10px", borderRadius: 6,
+                      background: "rgba(255,255,255,0.06)", color: "white",
+                      border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                    }}
+                  >
+                    <option value="COP">COP</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
+
+                {/* Notas */}
+                <textarea
+                  placeholder="Notas (opcional)"
+                  value={formAlquilerRapido.notas}
+                  onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, notas: e.target.value })}
+                  rows={2}
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 6, marginBottom: 16,
+                    background: "rgba(255,255,255,0.06)", color: "white",
+                    border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.82rem",
+                    resize: "none", boxSizing: "border-box",
+                  }}
+                />
+
+                <div className="modal-actions" style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={handleCrearAlquilerRapido}
+                    style={{
+                      flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
+                      background: "linear-gradient(135deg, #6c63ff, #4f46e5)",
+                      color: "white", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer",
+                    }}
+                  >
+                    {selectedEmailIds.length > 1
+                      ? `Crear ${selectedEmailIds.length} alquileres`
+                      : "Crear alquiler"}
+                  </button>
+                  <button
+                    onClick={() => setShowModal(false)}
+                    style={{
+                      padding: "10px 18px", borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "transparent", color: "rgba(255,255,255,0.6)",
+                      fontSize: "0.9rem", cursor: "pointer",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </>
             )}
           </div>
