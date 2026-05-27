@@ -1207,7 +1207,7 @@ function Rentals() {
                 <input type="number" value={formDias} onChange={(e) => setFormDias(e.target.value)} min="1" />
                 {selectedRental && formDias && (
                   <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
-                    📅 Nueva fecha fin: {formatDate(addDays(selectedRental.fecha_fin, parseInt(formDias) || 0))}
+                    📅 Nueva fecha fin: {formatDate(addDays(selectedRental.fecha_fin.split("T")[0], parseInt(formDias) || 0))}
                   </p>
                 )}
                 <label style={{ marginTop: "10px", display: "block" }}>Precio (opcional — actualiza si cambió)</label>
