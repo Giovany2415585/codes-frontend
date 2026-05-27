@@ -26,13 +26,13 @@ function Layout() {
       <div className="main-area">
         <header className="navbar">
           <div className="nav-left">
+            {/* ☰ solo en mobile — en desktop el toggle está en el sidebar */}
             <button
               className="menu-btn"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               ☰
             </button>
-
             <h3>{t("navbar.panel")}</h3>
           </div>
 
@@ -57,14 +57,13 @@ function Layout() {
           </div>
         </header>
 
-   <main className="content">
+        <main className="content">
           <Outlet />
         </main>
-        <footer className="footer">
-          © {new Date().getFullYear()} CINEBOX.NET
-        </footer>
+        {/* Footer eliminado — más espacio para el contenido */}
       </div>
     </div>
   );
 }
+
 export default Layout;

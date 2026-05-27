@@ -36,8 +36,9 @@
   gap: 12px;
 }
 
+/* ☰ solo visible en mobile */
 .menu-btn {
-  display: block;
+  display: none;
   font-size: 22px;
   background: transparent;
   border: none;
@@ -53,19 +54,8 @@
   display: flex;
   flex-direction: column;
 }
-.footer {
-  padding: 12px 0;
-  font-size: 13px;
-}
-.footer {
-  height: 50px;
-  background: var(--bg-navbar);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-top: 1px solid #1f2937;
-  font-size: 14px;
-}
+
+/* Footer eliminado */
 
 .logout-btn {
   background: #ef4444;
