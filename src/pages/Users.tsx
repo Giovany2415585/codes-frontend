@@ -361,7 +361,10 @@ function Users() {
 
   const handleBulkEmailList = async () => {
     if (!selectedUser) { toast.error(t("users.selectUserFirst")); return; }
-    const emails = bulkEmailList.split("\n").map((e) => e.trim()).filter((e) => e.includes("@"));
+    // Parsear cada línea — tomar solo el correo (primera parte antes de tab/espacio)
+    const emails = bulkEmailList.split("\n")
+      .map((line) => line.trim().split(/\t|  +/)[0].trim().toLowerCase())
+      .filter((e) => e.includes("@") && e.includes("."));
     if (emails.length === 0) { toast.error("No se encontraron correos válidos"); return; }
     try {
       await apiFetch("/api/admin/authorized-emails/bulk", {
@@ -946,7 +949,7 @@ function Users() {
               {showBulkEmailList && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
                   <textarea
-                    placeholder={"Un correo por línea:\ncorreo1@gmail.com\ncorreo2@gmail.com"}
+                    placeholder={"Un correo por línea (contraseña opcional):\ncorreo1@gmail.com\tclave123\ncorreo2@gmail.com"}
                     value={bulkEmailList}
                     onChange={(e) => setBulkEmailList(e.target.value)}
                     rows={5}
