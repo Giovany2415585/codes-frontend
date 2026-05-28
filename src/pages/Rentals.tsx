@@ -1247,10 +1247,10 @@ function Rentals() {
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input
                     type="number"
-                    placeholder={`Precio actual: ${selectedRental?.precio || 0}`}
+                    placeholder={`${selectedRental?.precio || 0}`}
                     value={formRenovar.precio}
                     onChange={(e) => setFormRenovar({ ...formRenovar, precio: e.target.value })}
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, padding: "8px 10px", borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontSize: "0.9rem", minWidth: 0 }}
                   />
                   <select
                     value={formRenovar.divisa}
