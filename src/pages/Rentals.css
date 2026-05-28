@@ -751,6 +751,18 @@
 
 .rentals-modal select option { background: #1e293b; color: #f1f5f9; }
 
+.rentals-modal .divisa-select {
+  width: 90px !important;
+  flex-shrink: 0;
+  padding: 9px 6px;
+}
+
+.rentals-modal .precio-input {
+  flex: 1;
+  min-width: 0;
+  width: auto !important;
+}
+
 .modal-actions { display: flex; gap: 8px; margin-top: 4px; }
 
 .dias-quick { display: flex; gap: 8px; flex-wrap: wrap; }

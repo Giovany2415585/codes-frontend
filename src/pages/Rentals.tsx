@@ -1244,17 +1244,19 @@ function Rentals() {
                   </p>
                 )}
                 <label style={{ marginTop: "10px", display: "block" }}>Precio (opcional — actualiza si cambió)</label>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <input
                     type="number"
                     placeholder={`${selectedRental?.precio || 0}`}
                     value={formRenovar.precio}
                     onChange={(e) => setFormRenovar({ ...formRenovar, precio: e.target.value })}
-                    style={{ flex: 1, padding: "8px 10px", borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontSize: "0.9rem", minWidth: 0 }}
+                    style={{ flex: 1, padding: "8px 10px", borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontSize: "0.9rem", minWidth: 0, width: "100%" }}
                   />
                   <select
+                    className="divisa-select"
                     value={formRenovar.divisa}
                     onChange={(e) => setFormRenovar({ ...formRenovar, divisa: e.target.value })}
+                    style={{ width: 90, flexShrink: 0, padding: "8px 6px", borderRadius: 6, background: "#1e293b", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
                   >
                     <option value="COP">COP</option>
                     <option value="USDT">USDT</option>
