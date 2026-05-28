@@ -116,6 +116,7 @@ function Users() {
     notas: "",
     password: "",
   });
+  const [passwordsIndividuales, setPasswordsIndividuales] = useState<Record<string, string>>({});
   const [nuevaPlataformaRapida, setNuevaPlataformaRapida] = useState("");
   const [showNuevaPlataformaRapida, setShowNuevaPlataformaRapida] = useState(false);
 
@@ -568,6 +569,7 @@ function Users() {
       notas: "",
       password: "",
     });
+    setPasswordsIndividuales({});
     setNuevaPlataformaRapida("");
     setShowNuevaPlataformaRapida(false);
     setModalType("crearAlquiler");
@@ -610,7 +612,8 @@ function Users() {
           plataforma: formAlquilerRapido.plataforma,
           correos: correosSeleccionados.map(correo => ({
             correo,
-            password: formAlquilerRapido.password || null,
+            // Contraseña individual si existe, si no la común
+            password: passwordsIndividuales[correo] || formAlquilerRapido.password || null,
           })),
           fecha_inicio: formAlquilerRapido.fecha_inicio,
           fecha_fin,
@@ -1096,19 +1099,39 @@ function Users() {
                   {selectedEmailIds.length} correo{selectedEmailIds.length > 1 ? "s" : ""} seleccionado{selectedEmailIds.length > 1 ? "s" : ""}
                 </p>
 
-                {/* Vista previa de correos que se van a asignar */}
+                {/* Correos seleccionados con contraseña individual */}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 6 }}>
+                  Correos seleccionados — agrega contraseña a cada uno (opcional):
+                </label>
                 <div style={{
-                  background: "rgba(108,99,255,0.1)",
-                  border: "1px solid rgba(108,99,255,0.3)",
-                  borderRadius: 8,
-                  padding: "8px 12px",
+                  background: "rgba(108,99,255,0.07)",
+                  border: "1px solid rgba(108,99,255,0.2)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
                   marginBottom: 14,
-                  maxHeight: 120,
+                  maxHeight: 200,
                   overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
                 }}>
                   {selectedEmailAddresses.map((c) => (
-                    <div key={c} style={{ fontSize: "0.78rem", color: "#c4b5fd", padding: "2px 0", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: "#6c63ff" }}>📧</span> {c}
+                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: "0.78rem", color: "#a5b4fc", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        📧 {c}
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="🔑 contraseña"
+                        value={passwordsIndividuales[c] || ""}
+                        onChange={(e) => setPasswordsIndividuales(prev => ({ ...prev, [c]: e.target.value }))}
+                        style={{
+                          width: 130, padding: "4px 8px", borderRadius: 6, flexShrink: 0,
+                          background: "rgba(255,255,255,0.06)", color: "white",
+                          border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.75rem",
+                          fontFamily: "monospace",
+                        }}
+                      />
                     </div>
                   ))}
                 </div>
@@ -1276,23 +1299,6 @@ function Users() {
                     <option value="USDT">USDT</option>
                   </select>
                 </div>
-
-                {/* Contraseña común */}
-                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
-                  Contraseña (opcional — misma para todos los correos)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: NexaVolt8841#"
-                  value={formAlquilerRapido.password}
-                  onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, password: e.target.value })}
-                  style={{
-                    width: "100%", padding: "8px 10px", borderRadius: 6, marginBottom: 10,
-                    background: "rgba(255,255,255,0.06)", color: "white",
-                    border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
-                    boxSizing: "border-box", fontFamily: "monospace",
-                  }}
-                />
 
                 {/* Notas */}
                 <textarea
