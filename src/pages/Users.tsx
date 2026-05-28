@@ -1362,7 +1362,7 @@ function Users() {
                     Cancelar
                   </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
