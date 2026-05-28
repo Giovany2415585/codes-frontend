@@ -109,17 +109,14 @@ function Users() {
   const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
   const [formAlquilerRapido, setFormAlquilerRapido] = useState({
     plataforma: "",
-    fecha_inicio: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
+    fecha_inicio: new Date().toISOString().split("T")[0],
     dias: "30",
     precio: "",
     divisa: "COP",
     notas: "",
-    password: "",
   });
-  const [passwordsIndividuales, setPasswordsIndividuales] = useState<Record<string, string>>({});
   const [nuevaPlataformaRapida, setNuevaPlataformaRapida] = useState("");
   const [showNuevaPlataformaRapida, setShowNuevaPlataformaRapida] = useState(false);
-  const [showPlataformasRapido, setShowPlataformasRapido] = useState(false);
 
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(userSearch.toLowerCase())
@@ -258,11 +255,9 @@ function Users() {
   const handleDeleteSelectedEmails = async () => {
     if (!selectedUser || selectedEmailIds.length === 0) return;
     try {
-      // Bulk delete — una sola notificación Telegram
-      await apiFetch("/api/admin/authorized-emails/bulk-delete", {
-        method: "DELETE",
-        body: JSON.stringify({ authorized_email_ids: selectedEmailIds }),
-      });
+      for (const id of selectedEmailIds) {
+        await apiFetch(`/api/admin/authorized-emails/${id}`, { method: "DELETE" });
+      }
       toast.success(`${selectedEmailIds.length} correo(s) eliminado(s)`);
       const data = await apiFetch(`/api/admin/users/${selectedUser.id}/authorized-emails`);
       setAuthorizedEmails(data.map((e: AuthorizedEmail) => ({ ...e, selected: false })));
@@ -363,10 +358,7 @@ function Users() {
 
   const handleBulkEmailList = async () => {
     if (!selectedUser) { toast.error(t("users.selectUserFirst")); return; }
-    // Parsear cada línea — tomar solo el correo (primera parte antes de tab/espacio)
-    const emails = bulkEmailList.split("\n")
-      .map((line) => line.trim().split(/\t|  +/)[0].trim().toLowerCase())
-      .filter((e) => e.includes("@") && e.includes("."));
+    const emails = bulkEmailList.split("\n").map((e) => e.trim()).filter((e) => e.includes("@"));
     if (emails.length === 0) { toast.error("No se encontraron correos válidos"); return; }
     try {
       await apiFetch("/api/admin/authorized-emails/bulk", {
@@ -560,35 +552,17 @@ function Users() {
   };
 
   // ── Alquiler rápido ──────────────────────────────────────────────────────────
-  const openModalAlquilerRapido = async () => {
-    const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+  const openModalAlquilerRapido = () => {
     setFormAlquilerRapido({
       plataforma: "",
-      fecha_inicio: today,
+      fecha_inicio: new Date().toISOString().split("T")[0],
       dias: "30",
       precio: "",
       divisa: "COP",
       notas: "",
-      password: "",
     });
-    // Precargar contraseñas desde alquileres activos
-    try {
-      if (selectedUser) {
-        const alquileres = await apiFetch(`/api/alquileres?user_id=${selectedUser.id}`);
-        const pwMap: Record<string, string> = {};
-        for (const a of alquileres) {
-          if (a.correo && a.password) pwMap[a.correo] = a.password;
-        }
-        setPasswordsIndividuales(pwMap);
-      } else {
-        setPasswordsIndividuales({});
-      }
-    } catch {
-      setPasswordsIndividuales({});
-    }
     setNuevaPlataformaRapida("");
     setShowNuevaPlataformaRapida(false);
-    setShowPlataformasRapido(false);
     setModalType("crearAlquiler");
     setShowModal(true);
   };
@@ -621,24 +595,20 @@ function Users() {
     const correosSeleccionados = selectedEmailAddresses;
 
     try {
-      // Siempre bulk — una sola notificación Telegram
-      await apiFetch("/api/alquileres/bulk", {
-        method: "POST",
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          plataforma: formAlquilerRapido.plataforma,
-          correos: correosSeleccionados.map(correo => ({
+      for (const correo of correosSeleccionados) {
+        await apiFetch("/api/alquileres", {
+          method: "POST",
+          body: JSON.stringify({
+            user_id: selectedUser.id,
+            plataforma: formAlquilerRapido.plataforma,
             correo,
-            // Contraseña individual si existe, si no la común
-            password: passwordsIndividuales[correo] || formAlquilerRapido.password || null,
-          })),
-          fecha_inicio: formAlquilerRapido.fecha_inicio,
-          fecha_fin,
-          precio: parseFloat(formAlquilerRapido.precio) || 0,
-          divisa: formAlquilerRapido.divisa || "COP",
-          notas: formAlquilerRapido.notas || null,
-        }),
-      });
+            fecha_inicio: formAlquilerRapido.fecha_inicio,
+            fecha_fin,
+            precio: parseFloat(formAlquilerRapido.precio) || 0,
+            notas: formAlquilerRapido.notas || null,
+          }),
+        });
+      }
       const total = correosSeleccionados.length;
       toast.success(
         total > 1
@@ -646,6 +616,7 @@ function Users() {
           : `✅ Alquiler creado para ${selectedUser.first_name}`
       );
       setShowModal(false);
+      // Deseleccionar correos tras crear
       setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: false })));
     } catch (err: any) {
       toast.error(err.message || "Error creando alquiler");
@@ -969,7 +940,7 @@ function Users() {
               {showBulkEmailList && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
                   <textarea
-                    placeholder={"Un correo por línea (contraseña opcional):\ncorreo1@gmail.com\tclave123\ncorreo2@gmail.com"}
+                    placeholder={"Un correo por línea:\ncorreo1@gmail.com\ncorreo2@gmail.com"}
                     value={bulkEmailList}
                     onChange={(e) => setBulkEmailList(e.target.value)}
                     rows={5}
@@ -1116,54 +1087,28 @@ function Users() {
                   {selectedEmailIds.length} correo{selectedEmailIds.length > 1 ? "s" : ""} seleccionado{selectedEmailIds.length > 1 ? "s" : ""}
                 </p>
 
-                {/* Correos seleccionados con contraseña individual */}
-                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 6 }}>
-                  Correos seleccionados — agrega contraseña a cada uno (opcional):
-                </label>
+                {/* Vista previa de correos que se van a asignar */}
                 <div style={{
-                  background: "rgba(108,99,255,0.07)",
-                  border: "1px solid rgba(108,99,255,0.2)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
+                  background: "rgba(108,99,255,0.1)",
+                  border: "1px solid rgba(108,99,255,0.3)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
                   marginBottom: 14,
-                  maxHeight: 200,
+                  maxHeight: 120,
                   overflowY: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
                 }}>
                   {selectedEmailAddresses.map((c) => (
-                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: "0.78rem", color: "#a5b4fc", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        📧 {c}
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="🔑 contraseña"
-                        value={passwordsIndividuales[c] || ""}
-                        onChange={(e) => setPasswordsIndividuales(prev => ({ ...prev, [c]: e.target.value }))}
-                        style={{
-                          width: 130, padding: "4px 8px", borderRadius: 6, flexShrink: 0,
-                          background: "rgba(255,255,255,0.06)", color: "white",
-                          border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.75rem",
-                          fontFamily: "monospace",
-                        }}
-                      />
+                    <div key={c} style={{ fontSize: "0.78rem", color: "#c4b5fd", padding: "2px 0", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "#6c63ff" }}>📧</span> {c}
                     </div>
                   ))}
                 </div>
 
-                {/* Plataforma colapsable */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-                    Plataforma * {formAlquilerRapido.plataforma && <span style={{ color: "#a5b4fc", fontWeight: 700 }}>— {formAlquilerRapido.plataforma}</span>}
-                  </label>
-                  <button type="button" onClick={() => setShowPlataformasRapido(prev => !prev)}
-                    style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>
-                    {showPlataformasRapido ? "▲ Ocultar" : "▼ Ver"}
-                  </button>
-                </div>
-                {showPlataformasRapido && (<div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {/* Plataforma */}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Plataforma *
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {plataformas.map((p) => (
                     <button
                       key={p.id}
@@ -1202,7 +1147,7 @@ function Users() {
                     ➕ Nueva
                   </button>
                 </div>
-                )}
+
                 {showNuevaPlataformaRapida && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                     <input
@@ -1362,7 +1307,7 @@ function Users() {
                     Cancelar
                   </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
