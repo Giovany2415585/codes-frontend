@@ -4,7 +4,7 @@
 
 .users-card {
   display: flex;
-  min-height: 80vh;
+  height: 75vh;
   border-radius: 20px;
   overflow: visible;
   backdrop-filter: blur(20px);
@@ -53,7 +53,7 @@
   align-content: flex-start;
   padding-top: 6px;
   overflow-y: auto;
-  max-height: none;
+  max-height: 180px;
   min-height: 50px;
   resize: vertical;
 }
@@ -240,8 +240,8 @@
   padding: 22px;
   border-radius: 16px;
   width: 100%;
-  max-width: 360px;
-  max-height: 90vh;
+  max-width: 520px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -320,7 +320,7 @@
 .authorized-emails-wrapper {
   display: block;
   height: auto;
-  max-height: none;
+  max-height: 260px;
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 4px;
@@ -371,7 +371,7 @@
   gap: 12px;
   align-content: flex-start;
   padding-top: 6px;
-  max-height: none;
+  max-height: 260px;
   min-height: 60px;
   resize: vertical;
 }
@@ -428,7 +428,7 @@
 }
 
 .users-card {
-  min-height: 80vh;
+  min-height: 70vh;
   height: auto;
 }
 
@@ -816,7 +816,7 @@
   flex-wrap: wrap;
   gap: 8px;
   overflow-y: auto;
-  max-height: 200px;
+  max-height: 150px;
   min-height: 40px;
   resize: vertical;
 }
