@@ -38,6 +38,7 @@ interface Subject {
 interface SavedSubject {
   id: number;
   name: string;
+  categoria?: string | null;
 }
 
 interface DangerousSubject {
@@ -77,6 +78,10 @@ function Users() {
   const [savedSubjects, setSavedSubjects] = useState<SavedSubject[]>([]);
   const [dangerousSubjects, setDangerousSubjects] = useState<DangerousSubject[]>([]);
   const [showSavedSubjects, setShowSavedSubjects] = useState(false);
+  const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
+  const [editingSubject, setEditingSubject] = useState<SavedSubject | null>(null);
+  const [editSubjectName, setEditSubjectName] = useState("");
+  const [editSubjectCat, setEditSubjectCat] = useState("");
   const [showDangerousSubjects, setShowDangerousSubjects] = useState(false);
   const [newDangerousSubject, setNewDangerousSubject] = useState("");
   const [resetPassword, setResetPassword] = useState("");
@@ -887,19 +892,76 @@ function Users() {
             {showSavedSubjects && (
               <div className="saved-subjects-panel">
                 <p className="saved-subjects-title">📚 Biblioteca de asuntos</p>
-                <div className="saved-subjects-list">
-                  {savedSubjects.length === 0 && <p className="empty-saved">Sin asuntos guardados aún</p>}
-                  {savedSubjects.map((s) => (
-                    <div key={s.id} className="saved-subject-chip">
-                      <span onClick={() => {
-                        if (selectedEmail) setNewSubject(s.name);
-                        else setBulkSubjectName(s.name);
-                        toast.success("Asunto copiado");
-                      }}>{s.name}</span>
-                      <div className="chip-btn delete" onClick={() => handleDeleteSavedSubject(s.id)}>✕</div>
+                {(() => {
+                  // Agrupar por categoría
+                  const grupos: Record<string, SavedSubject[]> = {};
+                  savedSubjects.forEach(s => {
+                    const cat = s.categoria || "Sin categoría";
+                    if (!grupos[cat]) grupos[cat] = [];
+                    grupos[cat].push(s);
+                  });
+                  // Ordenar: Sin categoría al final
+                  const cats = Object.keys(grupos).sort((a, b) => {
+                    if (a === "Sin categoría") return 1;
+                    if (b === "Sin categoría") return -1;
+                    return a.localeCompare(b);
+                  });
+                  return cats.map(cat => (
+                    <div key={cat} style={{ marginBottom: 8 }}>
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.07)", marginBottom: 4 }}
+                        onClick={() => setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }))}
+                      >
+                        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "rgba(255,255,255,0.7)", flex: 1 }}>{cat}</span>
+                        <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>{collapsedCats[cat] ? "▶" : "▼"}</span>
+                      </div>
+                      {!collapsedCats[cat] && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, paddingLeft: 6 }}>
+                          {grupos[cat].map(s => (
+                            editingSubject?.id === s.id ? (
+                              <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 4, background: "rgba(99,102,241,0.1)", borderRadius: 6, padding: 6 }}>
+                                <input
+                                  value={editSubjectName}
+                                  onChange={e => setEditSubjectName(e.target.value)}
+                                  style={{ fontSize: "0.75rem", padding: "3px 6px", borderRadius: 4, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                                />
+                                <select
+                                  value={editSubjectCat}
+                                  onChange={e => setEditSubjectCat(e.target.value)}
+                                  style={{ fontSize: "0.75rem", padding: "3px 6px", borderRadius: 4, background: "#1e293b", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                                >
+                                  <option value="">Sin categoría</option>
+                                  {plataformas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                                </select>
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  <button onClick={async () => {
+                                    await apiFetch(`/api/admin/saved-subjects/${s.id}`, { method: "PUT", body: JSON.stringify({ name: editSubjectName, categoria: editSubjectCat || null }) });
+                                    setEditingSubject(null);
+                                    loadSavedSubjects();
+                                    toast.success("Asunto actualizado");
+                                  }} style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4, background: "#6366f1", border: "none", color: "white", cursor: "pointer" }}>Guardar</button>
+                                  <button onClick={() => setEditingSubject(null)} style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", border: "none", color: "white", cursor: "pointer" }}>Cancelar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div key={s.id} className="saved-subject-chip">
+                                <span onClick={() => {
+                                  if (selectedEmail) setNewSubject(s.name);
+                                  else setBulkSubjectName(s.name);
+                                  toast.success("Asunto copiado");
+                                }}>{s.name}</span>
+                                <div style={{ display: "flex", gap: 2 }}>
+                                  <div className="chip-btn edit" onClick={() => { setEditingSubject(s); setEditSubjectName(s.name); setEditSubjectCat(s.categoria || ""); }}>✎</div>
+                                  <div className="chip-btn delete" onClick={() => handleDeleteSavedSubject(s.id)}>✕</div>
+                                </div>
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  ));
+                })()}
               </div>
             )}
 
