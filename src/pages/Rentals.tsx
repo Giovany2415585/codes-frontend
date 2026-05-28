@@ -254,9 +254,11 @@ function Rentals() {
   const handleEliminarMasivo = async () => {
     if (selectedCuentas.length === 0) return;
     try {
-      for (const id of selectedCuentas) {
-        await apiFetch(`/api/alquileres/${id}`, { method: "DELETE" });
-      }
+      // Bulk — una sola notificación Telegram
+      await apiFetch("/api/alquileres/bulk-delete", {
+        method: "DELETE",
+        body: JSON.stringify({ ids: selectedCuentas }),
+      });
       toast.success(`${selectedCuentas.length} cuenta(s) eliminada(s)`);
       setShowModal(false);
       setSelectedCuentas([]);
@@ -847,9 +849,6 @@ function Rentals() {
                   </label>
                   {selectedCuentas.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button className="btn-pago-masivo" onClick={() => { setFormPagoMasivo({ monto: "", divisa: "COP", fecha_pago: new Date().toISOString().split("T")[0], estado: "pagado", metodo: metodosPago[0]?.nombre || "Efectivo", notas: "" }); setModalType("pagoMasivo"); setShowModal(true); }}>
-                        💳 Registrar pago a {selectedCuentas.length} cuenta(s)
-                      </button>
                       <button className="btn-eliminar-masivo" onClick={() => { setModalType("deleteMasivo"); setShowModal(true); }}>
                         🗑 Eliminar {selectedCuentas.length} seleccionada(s)
                       </button>
