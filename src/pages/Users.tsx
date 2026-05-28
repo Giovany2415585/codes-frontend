@@ -1163,7 +1163,7 @@ function Users() {
                     {showPlataformasRapido ? "▲ Ocultar" : "▼ Ver"}
                   </button>
                 </div>
-                {showPlataformasRapido && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {showPlataformasRapido && (<div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {plataformas.map((p) => (
                     <button
                       key={p.id}
@@ -1201,8 +1201,7 @@ function Users() {
                   >
                     ➕ Nueva
                   </button>
-                </div>}
-
+                </div>)}
                 {showNuevaPlataformaRapida && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                     <input
