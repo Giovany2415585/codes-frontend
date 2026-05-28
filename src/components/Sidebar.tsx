@@ -49,6 +49,7 @@ function Sidebar({ isOpen }: SidebarProps) {
     ...(user.role === "admin" ? [
       { to: "/users", icon: "👥", label: t("sidebar.users") },
       { to: "/rentals", icon: "🎬", label: "Alquileres" },
+      { to: "/dashboard", icon: "📊", label: "Actividad" },
       { to: "/security", icon: "🔒", label: "Seguridad" },
     ] : []),
     { to: "/profile", icon: "👤", label: t("sidebar.profile") },
