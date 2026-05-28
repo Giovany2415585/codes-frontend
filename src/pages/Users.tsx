@@ -114,6 +114,7 @@ function Users() {
     precio: "",
     divisa: "COP",
     notas: "",
+    password: "",
   });
   const [nuevaPlataformaRapida, setNuevaPlataformaRapida] = useState("");
   const [showNuevaPlataformaRapida, setShowNuevaPlataformaRapida] = useState(false);
@@ -562,6 +563,7 @@ function Users() {
       precio: "",
       divisa: "COP",
       notas: "",
+      password: "",
     });
     setNuevaPlataformaRapida("");
     setShowNuevaPlataformaRapida(false);
@@ -603,7 +605,10 @@ function Users() {
         body: JSON.stringify({
           user_id: selectedUser.id,
           plataforma: formAlquilerRapido.plataforma,
-          correos: correosSeleccionados,
+          correos: correosSeleccionados.map(correo => ({
+            correo,
+            password: formAlquilerRapido.password || null,
+          })),
           fecha_inicio: formAlquilerRapido.fecha_inicio,
           fecha_fin,
           precio: parseFloat(formAlquilerRapido.precio) || 0,
@@ -1268,6 +1273,23 @@ function Users() {
                     <option value="USDT">USDT</option>
                   </select>
                 </div>
+
+                {/* Contraseña común */}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Contraseña (opcional — misma para todos los correos)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: NexaVolt8841#"
+                  value={formAlquilerRapido.password}
+                  onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, password: e.target.value })}
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 6, marginBottom: 10,
+                    background: "rgba(255,255,255,0.06)", color: "white",
+                    border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                    boxSizing: "border-box", fontFamily: "monospace",
+                  }}
+                />
 
                 {/* Notas */}
                 <textarea

@@ -104,7 +104,7 @@ function Rentals() {
 
   const [correosDisponibles, setCorreosDisponibles] = useState<string[]>([]);
   const [bulkInput, setBulkInput] = useState("");
-  const [bulkCorreos, setBulkCorreos] = useState<string[]>([]);
+  const [bulkCorreos, setBulkCorreos] = useState<{correo: string, password: string | null}[]>([]);
 
   const [formRental, setFormRental] = useState({
     user_id: "",
@@ -141,6 +141,7 @@ function Rentals() {
   });
   const [formGarantia, setFormGarantia] = useState({
     correo_nuevo: "",
+    password_nuevo: "",
     notas: "",
   });
   const [formResolver, setFormResolver] = useState({ cuenta_reemplazo: "", notas: "" });
@@ -295,15 +296,29 @@ function Rentals() {
 
   const parseBulkCorreos = (input: string) => {
     const parsed = input
-      .split(/[;\n,\s]+/)
-      .map((c) => c.trim().toLowerCase())
-      .filter((c) => c.length > 0 && c.includes("@") && c.includes("."));
-    const unique = [...new Set(parsed)];
+      .split(/[\n]+/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && line.includes("@"))
+      .map((line) => {
+        // Separar por tab, múltiples espacios o punto y coma
+        const parts = line.split(/\t|;|  +/).map(p => p.trim()).filter(Boolean);
+        const correo = parts[0]?.toLowerCase() || "";
+        const password = parts[1] || null;
+        return { correo, password };
+      })
+      .filter((item) => item.correo.includes("@") && item.correo.includes("."));
+    // Deduplicar por correo
+    const seen = new Set();
+    const unique = parsed.filter(item => {
+      if (seen.has(item.correo)) return false;
+      seen.add(item.correo);
+      return true;
+    });
     setBulkCorreos(unique);
   };
 
   const removeBulkCorreo = (correo: string) => {
-    setBulkCorreos((prev) => prev.filter((c) => c !== correo));
+    setBulkCorreos((prev) => prev.filter((c) => c.correo !== correo));
   };
 
   const loadCorreos = async (userId: string) => {
@@ -407,16 +422,31 @@ function Rentals() {
       return;
     }
     const fecha_fin = addDays(formRental.fecha_inicio, parseInt(formRental.dias));
-    const correosParaCrear = bulkCorreos.length > 0 ? bulkCorreos : [formRental.correo || null];
+    const correosParaCrear = bulkCorreos.length > 0 ? bulkCorreos : [{ correo: formRental.correo || null, password: null }];
 
     try {
-      for (const correo of correosParaCrear) {
+      if (correosParaCrear.length > 1) {
+        await apiFetch("/api/alquileres/bulk", {
+          method: "POST",
+          body: JSON.stringify({
+            user_id: parseInt(formRental.user_id),
+            plataforma: formRental.plataforma,
+            correos: correosParaCrear,
+            fecha_inicio: formRental.fecha_inicio,
+            fecha_fin,
+            precio: parseFloat(formRental.precio) || 0,
+            divisa: formRental.divisa || "COP",
+            notas: formRental.notas,
+          }),
+        });
+      } else {
         await apiFetch("/api/alquileres", {
           method: "POST",
           body: JSON.stringify({
             user_id: parseInt(formRental.user_id),
             plataforma: formRental.plataforma,
-            correo: correo || null,
+            correo: correosParaCrear[0].correo || null,
+            password: correosParaCrear[0].password || null,
             fecha_inicio: formRental.fecha_inicio,
             fecha_fin,
             precio: parseFloat(formRental.precio) || 0,
@@ -507,6 +537,7 @@ function Rentals() {
         method: "POST",
         body: JSON.stringify({
           correo_nuevo: formGarantia.correo_nuevo,
+          password_nuevo: formGarantia.password_nuevo || null,
           notas: formGarantia.notas,
         }),
       });
@@ -575,7 +606,7 @@ function Rentals() {
     }
 
     if (type === "renovar") { setFormDias("30"); setFormRenovar({ precio: String(rental?.precio || ""), divisa: (rental as any)?.divisa || "COP" }); }
-    if (type === "garantia") setFormGarantia({ correo_nuevo: "", notas: "" });
+    if (type === "garantia") setFormGarantia({ correo_nuevo: "", password_nuevo: "", notas: "" });
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
     setShowModal(true);
@@ -1074,8 +1105,8 @@ function Rentals() {
                   <option value="USDT">USDT</option>
                 </select>
 
-                <label>Organiza múltiples correos separados por <span style={{ color: "#a5b4fc", fontFamily: "monospace" }}>;</span></label>
-                <textarea rows={3} placeholder="correo1@gmail.com;correo2@gmail.com" value={bulkInput} onChange={(e) => { setBulkInput(e.target.value); parseBulkCorreos(e.target.value); }} style={{ fontFamily: "monospace", fontSize: "0.82rem" }} />
+                <label>Un correo por línea. Puedes agregar la contraseña con tab o doble espacio:</label>
+                <textarea rows={4} placeholder={"correo1@gmail.com\tclave123\ncorreo2@gmail.com\tclave456\ncorreo3@gmail.com"} value={bulkInput} onChange={(e) => { setBulkInput(e.target.value); parseBulkCorreos(e.target.value); }} style={{ fontFamily: "monospace", fontSize: "0.82rem" }} />
 
                 {bulkCorreos.length > 0 && (
                   <div className="bulk-preview">
@@ -1084,10 +1115,13 @@ function Rentals() {
                       <span className="bulk-count">{bulkCorreos.length} cuenta{bulkCorreos.length > 1 ? "s" : ""}</span>
                     </div>
                     <div className="bulk-list">
-                      {bulkCorreos.map((c) => (
-                        <div key={c} className="bulk-item">
-                          <span className="bulk-correo">{c}</span>
-                          <button className="bulk-remove" onClick={() => removeBulkCorreo(c)}>✕</button>
+                      {bulkCorreos.map((item) => (
+                        <div key={item.correo} className="bulk-item">
+                          <span className="bulk-correo">
+                            {item.correo}
+                            {item.password && <span style={{ color: "#a5b4fc", marginLeft: 8 }}>🔑 {item.password}</span>}
+                          </span>
+                          <button className="bulk-remove" onClick={() => removeBulkCorreo(item.correo)}>✕</button>
                         </div>
                       ))}
                     </div>
@@ -1268,6 +1302,16 @@ function Rentals() {
                   value={formGarantia.correo_nuevo}
                   onChange={(e) => setFormGarantia({ ...formGarantia, correo_nuevo: e.target.value })}
                   autoFocus
+                />
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
+                  Contraseña del nuevo correo (opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: NexaVolt8841#"
+                  value={formGarantia.password_nuevo}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, password_nuevo: e.target.value })}
+                  style={{ fontFamily: "monospace" }}
                 />
                 <textarea
                   placeholder="Notas (opcional)"
