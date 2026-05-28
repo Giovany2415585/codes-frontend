@@ -134,14 +134,17 @@ function Users() {
 
   const selectedEmailIds = authorizedEmails.filter((e) => e.selected).map((e) => e.id);
   const selectedEmailAddresses = authorizedEmails.filter((e) => e.selected).map((e) => e.email);
-  const allSelected = authorizedEmails.length > 0 && authorizedEmails.every((e) => e.selected);
+  const allSelected = filteredEmails.length > 0 && filteredEmails.every((e) => e.selected);
 
   const toggleSelectEmail = (id: number) => {
     setAuthorizedEmails((prev) => prev.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
   };
 
   const toggleSelectAll = () => {
-    setAuthorizedEmails((prev) => prev.map((e) => ({ ...e, selected: !allSelected })));
+    const filteredIds = new Set(filteredEmails.map((e) => e.id));
+    setAuthorizedEmails((prev) => prev.map((e) =>
+      filteredIds.has(e.id) ? { ...e, selected: !allSelected } : e
+    ));
   };
 
   useEffect(() => {
