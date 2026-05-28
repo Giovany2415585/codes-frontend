@@ -1201,7 +1201,8 @@ function Users() {
                   >
                     ➕ Nueva
                   </button>
-                </div>)}
+                </div>
+                )}
                 {showNuevaPlataformaRapida && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                     <input
