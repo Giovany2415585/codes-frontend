@@ -109,7 +109,7 @@ function Users() {
   const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
   const [formAlquilerRapido, setFormAlquilerRapido] = useState({
     plataforma: "",
-    fecha_inicio: new Date().toISOString().split("T")[0],
+    fecha_inicio: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
     dias: "30",
     precio: "",
     divisa: "COP",
@@ -119,6 +119,7 @@ function Users() {
   const [passwordsIndividuales, setPasswordsIndividuales] = useState<Record<string, string>>({});
   const [nuevaPlataformaRapida, setNuevaPlataformaRapida] = useState("");
   const [showNuevaPlataformaRapida, setShowNuevaPlataformaRapida] = useState(false);
+  const [showPlataformasRapido, setShowPlataformasRapido] = useState(false);
 
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(userSearch.toLowerCase())
@@ -559,19 +560,35 @@ function Users() {
   };
 
   // ── Alquiler rápido ──────────────────────────────────────────────────────────
-  const openModalAlquilerRapido = () => {
+  const openModalAlquilerRapido = async () => {
+    const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
     setFormAlquilerRapido({
       plataforma: "",
-      fecha_inicio: new Date().toISOString().split("T")[0],
+      fecha_inicio: today,
       dias: "30",
       precio: "",
       divisa: "COP",
       notas: "",
       password: "",
     });
-    setPasswordsIndividuales({});
+    // Precargar contraseñas desde alquileres activos
+    try {
+      if (selectedUser) {
+        const alquileres = await apiFetch(`/api/alquileres?user_id=${selectedUser.id}`);
+        const pwMap: Record<string, string> = {};
+        for (const a of alquileres) {
+          if (a.correo && a.password) pwMap[a.correo] = a.password;
+        }
+        setPasswordsIndividuales(pwMap);
+      } else {
+        setPasswordsIndividuales({});
+      }
+    } catch {
+      setPasswordsIndividuales({});
+    }
     setNuevaPlataformaRapida("");
     setShowNuevaPlataformaRapida(false);
+    setShowPlataformasRapido(false);
     setModalType("crearAlquiler");
     setShowModal(true);
   };
@@ -1136,11 +1153,17 @@ function Users() {
                   ))}
                 </div>
 
-                {/* Plataforma */}
-                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
-                  Plataforma *
-                </label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {/* Plataforma colapsable */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
+                    Plataforma * {formAlquilerRapido.plataforma && <span style={{ color: "#a5b4fc", fontWeight: 700 }}>— {formAlquilerRapido.plataforma}</span>}
+                  </label>
+                  <button type="button" onClick={() => setShowPlataformasRapido(prev => !prev)}
+                    style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>
+                    {showPlataformasRapido ? "▲ Ocultar" : "▼ Ver"}
+                  </button>
+                </div>
+                {showPlataformasRapido && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {plataformas.map((p) => (
                     <button
                       key={p.id}
@@ -1178,7 +1201,7 @@ function Users() {
                   >
                     ➕ Nueva
                   </button>
-                </div>
+                </div>}
 
                 {showNuevaPlataformaRapida && (
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
