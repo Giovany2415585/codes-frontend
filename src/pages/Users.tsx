@@ -1207,16 +1207,12 @@ function Users() {
                   <div style={{ marginBottom: 14 }}>
                     <textarea
                       rows={selectedEmailAddresses.length}
-                      placeholder={"Una contraseña por línea (en el mismo orden que los correos):
-clave1
-clave2
-clave3"}
+                      placeholder="Una contraseña por línea, mismo orden que correos"
                       value={bulkPasswordText}
                       onChange={(e) => {
                         setBulkPasswordText(e.target.value);
                         // Mapear contraseñas a correos en orden
-                        const claves = e.target.value.split("
-").map(l => l.trim());
+                        const claves = e.target.value.split("\n").map(l => l.trim());
                         const newPasswords: Record<string, string> = {};
                         selectedEmailAddresses.forEach((correo, i) => {
                           newPasswords[correo] = claves[i] || "";
@@ -1230,8 +1226,7 @@ clave3"}
                     />
                     {/* Advertencia si no coinciden */}
                     {(() => {
-                      const claves = bulkPasswordText.split("
-").map(l => l.trim()).filter(l => l.length > 0);
+                      const claves = bulkPasswordText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
                       if (claves.length === 0) return null;
                       if (claves.length > selectedEmailAddresses.length) {
                         return <p style={{ color: "#f87171", fontSize: "0.75rem", margin: "4px 0 0" }}>
@@ -1250,8 +1245,7 @@ clave3"}
                     {/* Preview correo → clave */}
                     <div style={{ marginTop: 8, background: "rgba(108,99,255,0.07)", border: "1px solid rgba(108,99,255,0.15)", borderRadius: 8, padding: "6px 10px", maxHeight: 150, overflowY: "auto" }}>
                       {selectedEmailAddresses.map((c, i) => {
-                        const claves = bulkPasswordText.split("
-").map(l => l.trim());
+                        const claves = bulkPasswordText.split("\n").map(l => l.trim());
                         const clave = claves[i] || "";
                         return (
                           <div key={c} style={{ display: "flex", gap: 8, fontSize: "0.75rem", padding: "2px 0" }}>
