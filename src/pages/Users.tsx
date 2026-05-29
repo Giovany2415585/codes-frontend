@@ -125,6 +125,8 @@ function Users() {
   const [nuevaPlataformaRapida, setNuevaPlataformaRapida] = useState("");
   const [showNuevaPlataformaRapida, setShowNuevaPlataformaRapida] = useState(false);
   const [showPlataformasRapido, setShowPlataformasRapido] = useState(false);
+  const [bulkPasswordMode, setBulkPasswordMode] = useState(false);
+  const [bulkPasswordText, setBulkPasswordText] = useState("");
 
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(userSearch.toLowerCase())
@@ -597,6 +599,8 @@ function Users() {
     setNuevaPlataformaRapida("");
     setShowNuevaPlataformaRapida(false);
     setShowPlataformasRapido(false);
+    setBulkPasswordMode(false);
+    setBulkPasswordText("");
     setModalType("crearAlquiler");
     setShowModal(true);
   };
@@ -1181,42 +1185,113 @@ function Users() {
                   {selectedEmailIds.length} correo{selectedEmailIds.length > 1 ? "s" : ""} seleccionado{selectedEmailIds.length > 1 ? "s" : ""}
                 </p>
 
-                {/* Correos seleccionados con contraseña individual */}
-                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 6 }}>
-                  Correos seleccionados — agrega contraseña a cada uno (opcional):
-                </label>
-                <div style={{
-                  background: "rgba(108,99,255,0.07)",
-                  border: "1px solid rgba(108,99,255,0.2)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  marginBottom: 14,
-                  maxHeight: 200,
-                  overflowY: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                }}>
-                  {selectedEmailAddresses.map((c) => (
-                    <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: "0.78rem", color: "#a5b4fc", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        📧 {c}
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="🔑 contraseña"
-                        value={passwordsIndividuales[c] || ""}
-                        onChange={(e) => setPasswordsIndividuales(prev => ({ ...prev, [c]: e.target.value }))}
-                        style={{
-                          width: 130, padding: "4px 8px", borderRadius: 6, flexShrink: 0,
-                          background: "rgba(255,255,255,0.06)", color: "white",
-                          border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.75rem",
-                          fontFamily: "monospace",
-                        }}
-                      />
-                    </div>
-                  ))}
+                {/* Correos seleccionados con contraseña */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
+                    Correos seleccionados ({selectedEmailAddresses.length})
+                  </label>
+                  <button type="button"
+                    onClick={() => {
+                      setBulkPasswordMode(prev => !prev);
+                      setBulkPasswordText("");
+                    }}
+                    style={{ fontSize: "0.72rem", padding: "2px 10px", borderRadius: 6,
+                      border: "1px solid rgba(255,255,255,0.15)", background: bulkPasswordMode ? "rgba(99,102,241,0.3)" : "transparent",
+                      color: bulkPasswordMode ? "#a5b4fc" : "rgba(255,255,255,0.5)", cursor: "pointer" }}>
+                    📋 {bulkPasswordMode ? "Modo individual" : "Pegar lista de claves"}
+                  </button>
                 </div>
+
+                {bulkPasswordMode ? (
+                  /* Modo lista bulk */
+                  <div style={{ marginBottom: 14 }}>
+                    <textarea
+                      rows={selectedEmailAddresses.length}
+                      placeholder={"Una contraseña por línea (en el mismo orden que los correos):
+clave1
+clave2
+clave3"}
+                      value={bulkPasswordText}
+                      onChange={(e) => {
+                        setBulkPasswordText(e.target.value);
+                        // Mapear contraseñas a correos en orden
+                        const claves = e.target.value.split("
+").map(l => l.trim());
+                        const newPasswords: Record<string, string> = {};
+                        selectedEmailAddresses.forEach((correo, i) => {
+                          newPasswords[correo] = claves[i] || "";
+                        });
+                        setPasswordsIndividuales(newPasswords);
+                      }}
+                      style={{ width: "100%", fontFamily: "monospace", fontSize: "0.82rem",
+                        background: "rgba(255,255,255,0.05)", color: "white",
+                        border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+                        padding: "8px 10px", boxSizing: "border-box", resize: "none" }}
+                    />
+                    {/* Advertencia si no coinciden */}
+                    {(() => {
+                      const claves = bulkPasswordText.split("
+").map(l => l.trim()).filter(l => l.length > 0);
+                      if (claves.length === 0) return null;
+                      if (claves.length > selectedEmailAddresses.length) {
+                        return <p style={{ color: "#f87171", fontSize: "0.75rem", margin: "4px 0 0" }}>
+                          ⚠️ Hay {claves.length - selectedEmailAddresses.length} contraseña(s) de más
+                        </p>;
+                      }
+                      if (claves.length < selectedEmailAddresses.length) {
+                        return <p style={{ color: "#fbbf24", fontSize: "0.75rem", margin: "4px 0 0" }}>
+                          ⚠️ Faltan {selectedEmailAddresses.length - claves.length} contraseña(s) — los correos sin clave quedarán sin contraseña
+                        </p>;
+                      }
+                      return <p style={{ color: "#4ade80", fontSize: "0.75rem", margin: "4px 0 0" }}>
+                        ✅ {claves.length} contraseñas listas
+                      </p>;
+                    })()}
+                    {/* Preview correo → clave */}
+                    <div style={{ marginTop: 8, background: "rgba(108,99,255,0.07)", border: "1px solid rgba(108,99,255,0.15)", borderRadius: 8, padding: "6px 10px", maxHeight: 150, overflowY: "auto" }}>
+                      {selectedEmailAddresses.map((c, i) => {
+                        const claves = bulkPasswordText.split("
+").map(l => l.trim());
+                        const clave = claves[i] || "";
+                        return (
+                          <div key={c} style={{ display: "flex", gap: 8, fontSize: "0.75rem", padding: "2px 0" }}>
+                            <span style={{ color: "#a5b4fc", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📧 {c}</span>
+                            <span style={{ color: clave ? "#4ade80" : "rgba(255,255,255,0.3)", fontFamily: "monospace", flexShrink: 0 }}>
+                              {clave ? `🔑 ${clave}` : "sin clave"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* Modo individual */
+                  <div style={{
+                    background: "rgba(108,99,255,0.07)", border: "1px solid rgba(108,99,255,0.2)",
+                    borderRadius: 10, padding: "8px 10px", marginBottom: 14,
+                    maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
+                  }}>
+                    {selectedEmailAddresses.map((c) => (
+                      <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: "0.78rem", color: "#a5b4fc", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          📧 {c}
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="🔑 contraseña"
+                          value={passwordsIndividuales[c] || ""}
+                          onChange={(e) => setPasswordsIndividuales(prev => ({ ...prev, [c]: e.target.value }))}
+                          style={{
+                            width: 130, padding: "4px 8px", borderRadius: 6, flexShrink: 0,
+                            background: "rgba(255,255,255,0.06)", color: "white",
+                            border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.75rem",
+                            fontFamily: "monospace",
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Plataforma colapsable */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
