@@ -2,9 +2,6 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import "./Users.css";
 import { useTranslation } from "react-i18next";
-import PhoneInput from "react-phone-number-input";
-import "react-phone-number-input/style.css";
-import { isValidPhoneNumber } from "react-phone-number-input";
 import { apiFetch } from "../services/api";
 import { useRef } from "react";
 
@@ -91,6 +88,8 @@ function Users() {
   const [userSearch, setUserSearch] = useState("");
   const [activeSection, setActiveSection] = useState<"users" | "emails" | "subjects">("users");
   const [newUser, setNewUser] = useState({ first_name: "", email: "", phone: "", password: "" });
+  const [newUserPhoneCode, setNewUserPhoneCode] = useState("+57");
+  const [newUserPhoneNumber, setNewUserPhoneNumber] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newSubject, setNewSubject] = useState("");
   const [bulkSubjectName, setBulkSubjectName] = useState("");
@@ -101,6 +100,7 @@ function Users() {
   const subjectFileInputRef = useRef<HTMLInputElement | null>(null);
   const [modalData, setModalData] = useState<any>(null);
   const [editValue, setEditValue] = useState("");
+  const [editUserForm, setEditUserForm] = useState({ first_name: "", email: "", phone: "", newPassword: "" });
   const [emailFile, setEmailFile] = useState<File | null>(null);
   const [bulkEmailList, setBulkEmailList] = useState("");
   const [showBulkEmailList, setShowBulkEmailList] = useState(false);
@@ -485,11 +485,14 @@ function Users() {
     e.preventDefault();
     if (!newUser.first_name || !newUser.email || !newUser.password) { toast.error(t("users.requiredFields")); return; }
     if (newUser.password.length < 6) { toast.error(t("users.passwordMin")); return; }
-    if (newUser.phone && !isValidPhoneNumber(newUser.phone)) { toast.error(t("users.invalidPhone")); return; }
+    // Validación simple: solo dígitos si hay número
+    if (newUserPhoneNumber && !/^\d{6,}$/.test(newUserPhoneNumber)) { toast.error(t("users.invalidPhone")); return; }
+    const phone = newUserPhoneNumber ? `${newUserPhoneCode}${newUserPhoneNumber}` : "";
     try {
-      await apiFetch("/api/admin/users", { method: "POST", body: JSON.stringify(newUser) });
+      await apiFetch("/api/admin/users", { method: "POST", body: JSON.stringify({ ...newUser, phone }) });
       toast.success(t("users.userCreated"));
       setNewUser({ first_name: "", email: "", phone: "", password: "" });
+      setNewUserPhoneNumber("");
       loadUsers();
     } catch (err: any) {
       toast.error(err.message || t("users.createUserError"));
@@ -669,6 +672,14 @@ function Users() {
     setModalEntity(entity);
     setModalData(data);
     setEditValue(data.email || data.name || data.first_name);
+    if (entity === "user") {
+      setEditUserForm({
+        first_name: data.first_name || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        newPassword: "",
+      });
+    }
     setShowModal(true);
   };
 
@@ -686,8 +697,20 @@ function Users() {
         if (modalEntity === "user") {
           await apiFetch(`/api/admin/users/${modalData.id}`, {
             method: "PUT",
-            body: JSON.stringify({ first_name: modalData.first_name, email: editValue, phone: modalData.phone, role: modalData.role }),
+            body: JSON.stringify({
+              first_name: editUserForm.first_name,
+              email: editUserForm.email,
+              phone: editUserForm.phone,
+              role: modalData.role,
+            }),
           });
+          // Si se ingresó nueva contraseña, actualizarla por separado
+          if (editUserForm.newPassword && editUserForm.newPassword.length >= 6) {
+            await apiFetch(`/api/admin/users/${modalData.id}/reset-password`, {
+              method: "PUT",
+              body: JSON.stringify({ newPassword: editUserForm.newPassword }),
+            });
+          }
           loadUsers();
         }
         if (modalEntity === "email") {
@@ -1016,7 +1039,41 @@ function Users() {
           <form onSubmit={handleCreateUser} className="crud-form">
             <input placeholder={t("users.name")} value={newUser.first_name} onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })} />
             <input placeholder={t("users.email")} value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-            <PhoneInput international defaultCountry="CO" placeholder={t("users.phone")} value={newUser.phone} onChange={(value) => setNewUser({ ...newUser, phone: value || "" })} />
+            <div style={{ display: "flex", gap: 6 }}>
+              <select
+                value={newUserPhoneCode}
+                onChange={(e) => setNewUserPhoneCode(e.target.value)}
+                style={{ width: 90, flexShrink: 0, padding: "9px 6px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#f1f5f9", fontSize: "0.875rem" }}
+              >
+                <option value="+57">🇨🇴 +57</option>
+                <option value="+1">🇺🇸 +1</option>
+                <option value="+52">🇲🇽 +52</option>
+                <option value="+51">🇵🇪 +51</option>
+                <option value="+58">🇻🇪 +58</option>
+                <option value="+593">🇪🇨 +593</option>
+                <option value="+507">🇵🇦 +507</option>
+                <option value="+506">🇨🇷 +506</option>
+                <option value="+502">🇬🇹 +502</option>
+                <option value="+503">🇸🇻 +503</option>
+                <option value="+504">🇭🇳 +504</option>
+                <option value="+505">🇳🇮 +505</option>
+                <option value="+591">🇧🇴 +591</option>
+                <option value="+595">🇵🇾 +595</option>
+                <option value="+598">🇺🇾 +598</option>
+                <option value="+54">🇦🇷 +54</option>
+                <option value="+56">🇨🇱 +56</option>
+                <option value="+55">🇧🇷 +55</option>
+                <option value="+34">🇪🇸 +34</option>
+                <option value="+1809">🇩🇴 +1809</option>
+              </select>
+              <input
+                type="tel"
+                placeholder={t("users.phone")}
+                value={newUserPhoneNumber}
+                onChange={(e) => setNewUserPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                style={{ flex: 1 }}
+              />
+            </div>
             <input type="password" placeholder={t("users.password")} value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
             <button type="submit">{t("users.createUser")}</button>
           </form>
@@ -1129,7 +1186,61 @@ function Users() {
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
-            {modalType === "edit" && (
+            {modalType === "edit" && modalEntity === "user" && (
+              <>
+                <h3>{t("users.edit")}</h3>
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Nombre
+                </label>
+                <input
+                  value={editUserForm.first_name}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, first_name: e.target.value })}
+                  placeholder="Nombre completo"
+                />
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
+                  Teléfono
+                </label>
+                <input
+                  value={editUserForm.phone}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })}
+                  placeholder="+57 300 1234567"
+                />
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
+                  Correo
+                </label>
+                <input
+                  type="email"
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                  placeholder="correo@gmail.com"
+                />
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
+                  Nueva contraseña (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={editUserForm.newPassword}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, newPassword: e.target.value })}
+                  placeholder="Dejar vacío para no cambiar"
+                  style={{ fontFamily: "monospace" }}
+                />
+                {editUserForm.newPassword && editUserForm.newPassword.length > 0 && editUserForm.newPassword.length < 6 && (
+                  <p style={{ color: "#fbbf24", fontSize: "0.75rem", margin: "4px 0 0" }}>
+                    ⚠️ Mínimo 6 caracteres — no se actualizará si es más corta
+                  </p>
+                )}
+                {editUserForm.newPassword && editUserForm.newPassword.length >= 6 && (
+                  <p style={{ color: "#a5b4fc", fontSize: "0.75rem", margin: "4px 0 0" }}>
+                    🔐 Se notificará al cliente por Telegram
+                  </p>
+                )}
+                <div className="modal-actions" style={{ marginTop: 12 }}>
+                  <button className="btn-primary" onClick={handleConfirm}>Actualizar</button>
+                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                </div>
+              </>
+            )}
+            {modalType === "edit" && modalEntity !== "user" && (
               <>
                 <h3>{t("users.edit")}</h3>
                 <input value={editValue} onChange={(e) => setEditValue(e.target.value)} />
