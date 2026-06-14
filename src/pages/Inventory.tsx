@@ -27,6 +27,7 @@ function Inventory() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [showBulkForm, setShowBulkForm] = useState(false);
   const [bulkPlataforma, setBulkPlataforma] = useState("");
@@ -91,6 +92,14 @@ function Inventory() {
     setFilteredItems(filtered);
   };
 
+  // Conteo de cuentas DISPONIBLES por plataforma (solo plataformas con stock)
+  const disponiblesPorPlataforma = items
+    .filter((item) => item.estado === "Disponible")
+    .reduce((acc: Record<string, number>, item) => {
+      acc[item.plataforma] = (acc[item.plataforma] || 0) + 1;
+      return acc;
+    }, {});
+
   const handleAddOrEdit = async () => {
     if (!formData.correo || !formData.password || !formData.plataforma) {
       toast.error("Campos requeridos: correo, contraseña, plataforma");
@@ -113,6 +122,7 @@ function Inventory() {
       }
       setShowForm(false);
       setEditingId(null);
+      setShowPassword(false);
       setFormData({
         correo: "",
         password: "",
@@ -141,6 +151,7 @@ function Inventory() {
     notas: item.notas || "",
   });
   setEditingId(item.id);
+  setShowPassword(false);
   setShowForm(true);
 };
 
@@ -256,6 +267,14 @@ function Inventory() {
     }
   };
 
+  const fieldLabelStyle: React.CSSProperties = {
+    fontSize: "0.75rem",
+    opacity: 0.6,
+    marginBottom: "2px",
+    marginTop: "8px",
+    display: "block",
+  };
+
   return (
     <div className="inventory-page">
       <div className="inventory-header">
@@ -264,27 +283,73 @@ function Inventory() {
           <button className="btn-primary" onClick={() => setShowBulkForm(true)}>
             📥 Carga masiva
           </button>
-          <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "" }); }}>
+          <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setShowPassword(false); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "" }); }}>
             ➕ Agregar cuenta
           </button>
         </div>
       </div>
 
+      {/* Resumen de disponibilidad por plataforma */}
+      {Object.keys(disponiblesPorPlataforma).length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            fontSize: "0.8rem",
+          }}
+        >
+          {Object.entries(disponiblesPorPlataforma)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([plataforma, count]) => (
+              <span
+                key={plataforma}
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "999px",
+                  padding: "4px 10px",
+                  opacity: 0.85,
+                }}
+              >
+                {plataforma}: <b>{count}</b> 🟢
+              </span>
+            ))}
+        </div>
+      )}
+
       {showForm && (
         <div className="modal-overlay">
           <div className="modal">
             <h2>{editingId ? "Editar cuenta" : "Agregar cuenta"}</h2>
+
+            <label style={fieldLabelStyle}>Correo</label>
             <input
               placeholder="Correo"
               value={formData.correo}
               onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
             />
-            <input
-              type="password"
-              placeholder="Contraseña"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
+
+            <label style={fieldLabelStyle}>Contraseña</label>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Contraseña"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                title={showPassword ? "Ocultar" : "Mostrar"}
+                style={{ padding: "0 12px" }}
+              >
+                {showPassword ? "🙈" : "👁"}
+              </button>
+            </div>
+
+            <label style={fieldLabelStyle}>Plataforma</label>
             <select
               value={formData.plataforma}
               onChange={(e) => setFormData({ ...formData, plataforma: e.target.value })}
@@ -294,32 +359,42 @@ function Inventory() {
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
+
+            <label style={fieldLabelStyle}>Proveedor</label>
             <input
               placeholder="Proveedor"
               value={formData.proveedor}
               onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
             />
+
+            <label style={fieldLabelStyle}>Contraseña del correo</label>
             <input
               placeholder="Contraseña del correo"
               value={formData.correo_password}
               onChange={(e) => setFormData({ ...formData, correo_password: e.target.value })}
             />
+
+            <label style={fieldLabelStyle}>Correo de verificación</label>
             <input
               placeholder="Correo de verificación"
               value={formData.correo_verificacion}
               onChange={(e) => setFormData({ ...formData, correo_verificacion: e.target.value })}
             />
+
+            <label style={fieldLabelStyle}>Facturación</label>
             <input
               placeholder="Facturación (ej: Mensual, Anual)"
               value={formData.facturacion}
               onChange={(e) => setFormData({ ...formData, facturacion: e.target.value })}
             />
+
+            <label style={fieldLabelStyle}>Notas</label>
             <textarea
               placeholder="Notas"
               value={formData.notas}
               onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
             />
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
               <button onClick={handleAddOrEdit}>Guardar</button>
               <button onClick={() => setShowForm(false)}>Cancelar</button>
             </div>
@@ -332,18 +407,20 @@ function Inventory() {
           <div className="modal" style={{ maxWidth: "700px" }}>
             <h2>📥 Carga masiva de cuentas</h2>
 
+            <label style={fieldLabelStyle}>Plataforma (para todo el lote)</label>
             <select
               value={bulkPlataforma}
               onChange={(e) => setBulkPlataforma(e.target.value)}
             >
-              <option value="">Selecciona plataforma (para todo el lote)</option>
+              <option value="">Selecciona plataforma</option>
               {plataformas.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
 
+            <label style={fieldLabelStyle}>Proveedor (para todo el lote, opcional)</label>
             <input
-              placeholder="Proveedor (para todo el lote, opcional)"
+              placeholder="Proveedor"
               value={bulkProveedor}
               onChange={(e) => setBulkProveedor(e.target.value)}
             />
@@ -451,6 +528,7 @@ function Inventory() {
                 <th>Plataforma</th>
                 <th>Estado</th>
                 <th>Proveedor</th>
+                <th>Facturación</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -472,6 +550,7 @@ function Inventory() {
                     {item.estado === "Caída" && "🟡 Caída"}
                   </td>
                   <td>{item.proveedor || "-"}</td>
+                  <td>{item.facturacion || "-"}</td>
                   <td>
                     <button onClick={() => handleEdit(item)}>✎</button>
                     <button onClick={() => handleDelete(item.id)}>✕</button>
