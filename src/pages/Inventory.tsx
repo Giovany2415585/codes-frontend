@@ -28,6 +28,12 @@ function Inventory() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const [showBulkForm, setShowBulkForm] = useState(false);
+  const [bulkPlataforma, setBulkPlataforma] = useState("");
+  const [bulkProveedor, setBulkProveedor] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     correo: "",
     password: "",
@@ -191,13 +197,77 @@ function Inventory() {
     }
   };
 
+  // Parsea el texto pegado (filas tipo Excel, separadas por TAB)
+  // Orden esperado: correo | password | facturacion | correo_password | correo_verificacion
+  const parseBulkText = () => {
+    const lines = bulkText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    return lines.map((line) => {
+      const cols = line.split("\t").map((c) => c.trim());
+      return {
+        correo: cols[0] || "",
+        password: cols[1] || "",
+        facturacion: cols[2] || "",
+        correo_password: cols[3] || "",
+        correo_verificacion: cols[4] || "",
+      };
+    });
+  };
+
+  const bulkPreview = bulkText.trim() ? parseBulkText() : [];
+
+  const handleBulkCreate = async () => {
+    if (!bulkPlataforma) {
+      toast.error("Selecciona la plataforma");
+      return;
+    }
+    const rows = parseBulkText();
+    if (rows.length === 0) {
+      toast.error("Pega al menos una fila");
+      return;
+    }
+
+    setBulkSubmitting(true);
+    try {
+      const result = await apiFetch("/api/admin/inventario/bulk/create", {
+        method: "POST",
+        body: JSON.stringify({
+          plataforma: bulkPlataforma,
+          proveedor: bulkProveedor || null,
+          rows,
+        }),
+      });
+      toast.success(result.message || "Cuentas agregadas");
+      if (result.errores && result.errores.length > 0) {
+        result.errores.forEach((e: string) => toast.error(e));
+      }
+      setShowBulkForm(false);
+      setBulkPlataforma("");
+      setBulkProveedor("");
+      setBulkText("");
+      loadInventario();
+    } catch (err: any) {
+      toast.error(err.message || "Error en carga masiva");
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
   return (
     <div className="inventory-page">
       <div className="inventory-header">
         <h1>📦 Inventario</h1>
-        <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "" }); }}>
-          ➕ Agregar cuenta
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button className="btn-primary" onClick={() => setShowBulkForm(true)}>
+            📥 Carga masiva
+          </button>
+          <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "" }); }}>
+            ➕ Agregar cuenta
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -252,6 +322,60 @@ function Inventory() {
             <div style={{ display: "flex", gap: "8px" }}>
               <button onClick={handleAddOrEdit}>Guardar</button>
               <button onClick={() => setShowForm(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkForm && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: "700px" }}>
+            <h2>📥 Carga masiva de cuentas</h2>
+
+            <select
+              value={bulkPlataforma}
+              onChange={(e) => setBulkPlataforma(e.target.value)}
+            >
+              <option value="">Selecciona plataforma (para todo el lote)</option>
+              {plataformas.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+
+            <input
+              placeholder="Proveedor (para todo el lote, opcional)"
+              value={bulkProveedor}
+              onChange={(e) => setBulkProveedor(e.target.value)}
+            />
+
+            <p style={{ fontSize: "0.85rem", opacity: 0.7, margin: "8px 0" }}>
+              Pega las filas copiadas desde Excel/Sheets. Columnas en este orden, separadas por TAB:
+              <br />
+              <b>Correo | Contraseña | Facturación | Pass Correo | Correo Verificación</b>
+            </p>
+
+            <textarea
+              placeholder={"TheobaldGrotz73@hotmail.com\tJac123123.\tBIN\t11usuario11\tcinebox.pnet@gmail.com\nKarynaEdris9164@hotmail.com\tJac123123\tBIN\t11usuario11\tcinebox.pnet@gmail.com"}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              rows={8}
+              style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
+            />
+
+            {bulkPreview.length > 0 && (
+              <p style={{ fontSize: "0.85rem", opacity: 0.8 }}>
+                {bulkPreview.length} cuenta(s) detectada(s)
+                {bulkPreview.some((r) => !r.correo || !r.password) && (
+                  <span style={{ color: "#f87171" }}> — hay filas incompletas (sin correo o contraseña)</span>
+                )}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={handleBulkCreate} disabled={bulkSubmitting}>
+                {bulkSubmitting ? "Agregando..." : `Agregar ${bulkPreview.length || ""} cuenta(s)`}
+              </button>
+              <button onClick={() => setShowBulkForm(false)}>Cancelar</button>
             </div>
           </div>
         </div>
