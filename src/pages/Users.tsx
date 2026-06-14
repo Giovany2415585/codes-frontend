@@ -1832,14 +1832,14 @@ function Users() {
                 )}
 
                 {/* Precio y divisa */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 10, width: "100%" }}>
                   <input
                     type="number"
                     placeholder="Precio por cuenta"
                     value={formAlquilerRapido.precio}
                     onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, precio: e.target.value })}
                     style={{
-                      flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 6,
+                      flex: "1 1 auto", width: "auto", minWidth: 0, padding: "8px 10px", borderRadius: 6,
                       background: "rgba(255,255,255,0.06)", color: "white",
                       border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
                       boxSizing: "border-box",
@@ -1849,7 +1849,7 @@ function Users() {
                     value={formAlquilerRapido.divisa}
                     onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, divisa: e.target.value })}
                     style={{
-                      flexShrink: 0, padding: "8px 10px", borderRadius: 6,
+                      flex: "0 0 90px", width: "90px", padding: "8px 6px", borderRadius: 6,
                       background: "rgba(255,255,255,0.06)", color: "white",
                       border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
                       boxSizing: "border-box",
