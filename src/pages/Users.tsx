@@ -1521,7 +1521,7 @@ function Users() {
                     <div style={{
                       background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.15)",
                       borderRadius: 10, padding: "8px 10px", marginBottom: 14,
-                      maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4,
+                      display: "flex", flexDirection: "column", gap: 4,
                     }}>
                       {!formAlquilerRapido.plataforma && (
                         <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", margin: 0 }}>
@@ -1839,18 +1839,20 @@ function Users() {
                     value={formAlquilerRapido.precio}
                     onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, precio: e.target.value })}
                     style={{
-                      flex: 1, padding: "8px 10px", borderRadius: 6,
+                      flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 6,
                       background: "rgba(255,255,255,0.06)", color: "white",
                       border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                      boxSizing: "border-box",
                     }}
                   />
                   <select
                     value={formAlquilerRapido.divisa}
                     onChange={(e) => setFormAlquilerRapido({ ...formAlquilerRapido, divisa: e.target.value })}
                     style={{
-                      padding: "8px 10px", borderRadius: 6,
+                      flexShrink: 0, padding: "8px 10px", borderRadius: 6,
                       background: "rgba(255,255,255,0.06)", color: "white",
                       border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                      boxSizing: "border-box",
                     }}
                   >
                     <option value="COP">COP</option>
