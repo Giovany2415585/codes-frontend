@@ -1410,7 +1410,7 @@ function Users() {
 
             {/* ── MODAL CREAR ALQUILER RÁPIDO ─────────────────────────────── */}
             {modalType === "crearAlquiler" && selectedUser && (
-              <>
+              <div style={{ maxHeight: "80vh", overflowY: "auto", paddingRight: 4 }}>
                 <h3>🎬 Crear alquiler</h3>
                 <p style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.5)", margin: "0 0 12px" }}>
                   Cliente: <strong style={{ color: "#a5b4fc" }}>{selectedUser.first_name}</strong>
@@ -1425,18 +1425,18 @@ function Users() {
                 {/* ── TOGGLE USAR INVENTARIO ── */}
                 <div
                   style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
                     background: usarInventario ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)",
                     border: `1px solid ${usarInventario ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}`,
                     borderRadius: 8, padding: "8px 12px", marginBottom: 12,
                   }}
                 >
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.85rem", color: usarInventario ? "#4ade80" : "rgba(255,255,255,0.7)" }}>
-                    <input type="checkbox" checked={usarInventario} onChange={handleToggleUsarInventario} />
-                    📦 Usar cuenta del inventario
+                  <label style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.85rem", color: usarInventario ? "#4ade80" : "rgba(255,255,255,0.7)", margin: 0, whiteSpace: "nowrap" }}>
+                    <input type="checkbox" checked={usarInventario} onChange={handleToggleUsarInventario} style={{ width: 16, height: 16, flexShrink: 0, margin: 0 }} />
+                    <span>📦 Usar cuenta del inventario</span>
                   </label>
                   {usarInventario && (
-                    <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>
+                    <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
                       {cuentasInventario.length} disponible{cuentasInventario.length !== 1 ? "s" : ""}
                     </span>
                   )}
@@ -1898,7 +1898,7 @@ function Users() {
                     Cancelar
                   </button>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
