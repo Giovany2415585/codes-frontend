@@ -48,6 +48,15 @@ interface Plataforma {
   nombre: string;
 }
 
+interface InventarioCuenta {
+  id: number;
+  correo: string;
+  password: string;
+  plataforma: string;
+  proveedor?: string;
+  estado: string;
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 function addDays(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split("-").map(Number);
@@ -127,6 +136,13 @@ function Users() {
   const [showPlataformasRapido, setShowPlataformasRapido] = useState(false);
   const [bulkPasswordMode, setBulkPasswordMode] = useState(false);
   const [bulkPasswordText, setBulkPasswordText] = useState("");
+
+  // ── Estado para uso de Inventario en alquiler rápido ────────────────────────
+  const [usarInventario, setUsarInventario] = useState(false);
+  const [cuentasInventario, setCuentasInventario] = useState<InventarioCuenta[]>([]);
+  const [inventarioSeleccionado, setInventarioSeleccionado] = useState<Record<string, number | "">>({});
+  const [asuntosPreview, setAsuntosPreview] = useState<SavedSubject[]>([]);
+  const [loadingInventario, setLoadingInventario] = useState(false);
 
   const filteredUsers = users.filter((u) =>
     u.email.toLowerCase().includes(userSearch.toLowerCase())
@@ -604,8 +620,48 @@ function Users() {
     setShowPlataformasRapido(false);
     setBulkPasswordMode(false);
     setBulkPasswordText("");
+    setUsarInventario(false);
+    setCuentasInventario([]);
+    setInventarioSeleccionado({});
+    setAsuntosPreview([]);
     setModalType("crearAlquiler");
     setShowModal(true);
+  };
+
+  // Cargar cuentas de inventario + asuntos previstos cuando cambia la plataforma (con inventario activo)
+  const loadInventarioYAsuntos = async (plataforma: string) => {
+    if (!plataforma) {
+      setCuentasInventario([]);
+      setAsuntosPreview([]);
+      return;
+    }
+    setLoadingInventario(true);
+    try {
+      const [cuentas, asuntos] = await Promise.all([
+        apiFetch(`/api/admin/inventario/disponibles/${encodeURIComponent(plataforma)}`),
+        apiFetch(`/api/alquileres/asuntos-por-plataforma/${encodeURIComponent(plataforma)}`),
+      ]);
+      setCuentasInventario(cuentas);
+      setAsuntosPreview(asuntos);
+    } catch {
+      setCuentasInventario([]);
+      setAsuntosPreview([]);
+      toast.error("Error cargando inventario/asuntos");
+    } finally {
+      setLoadingInventario(false);
+    }
+  };
+
+  const handleToggleUsarInventario = async () => {
+    const next = !usarInventario;
+    setUsarInventario(next);
+    setInventarioSeleccionado({});
+    if (next && formAlquilerRapido.plataforma) {
+      await loadInventarioYAsuntos(formAlquilerRapido.plataforma);
+    } else {
+      setCuentasInventario([]);
+      setAsuntosPreview([]);
+    }
   };
 
   const handleAgregarPlataformaRapida = async () => {
@@ -632,6 +688,15 @@ function Users() {
     if (!formAlquilerRapido.dias || parseInt(formAlquilerRapido.dias) < 1) { toast.error("Días inválidos"); return; }
     if (selectedEmailIds.length === 0) { toast.error("Selecciona al menos un correo"); return; }
 
+    // Si está usando inventario, validar que todos los correos tengan cuenta asignada
+    if (usarInventario) {
+      const faltantes = selectedEmailAddresses.filter((c) => !inventarioSeleccionado[c]);
+      if (faltantes.length > 0) {
+        toast.error(`Asigna una cuenta del inventario a: ${faltantes.join(", ")}`);
+        return;
+      }
+    }
+
     const fecha_fin = addDays(formAlquilerRapido.fecha_inicio, parseInt(formAlquilerRapido.dias));
     const correosSeleccionados = selectedEmailAddresses;
 
@@ -642,11 +707,16 @@ function Users() {
         body: JSON.stringify({
           user_id: selectedUser.id,
           plataforma: formAlquilerRapido.plataforma,
-          correos: correosSeleccionados.map(correo => ({
-            correo,
-            // Contraseña individual si existe, si no la común
-            password: passwordsIndividuales[correo] || formAlquilerRapido.password || null,
-          })),
+          correos: correosSeleccionados.map(correo => {
+            if (usarInventario) {
+              return { inventario_id: inventarioSeleccionado[correo] };
+            }
+            return {
+              correo,
+              // Contraseña individual si existe, si no la común
+              password: passwordsIndividuales[correo] || formAlquilerRapido.password || null,
+            };
+          }),
           fecha_inicio: formAlquilerRapido.fecha_inicio,
           fecha_fin,
           precio: parseFloat(formAlquilerRapido.precio) || 0,
@@ -1296,24 +1366,119 @@ function Users() {
                   {selectedEmailIds.length} correo{selectedEmailIds.length > 1 ? "s" : ""} seleccionado{selectedEmailIds.length > 1 ? "s" : ""}
                 </p>
 
-                {/* Correos seleccionados con contraseña */}
+                {/* ── TOGGLE USAR INVENTARIO ── */}
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    background: usarInventario ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${usarInventario ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}`,
+                    borderRadius: 8, padding: "8px 12px", marginBottom: 12,
+                  }}
+                >
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.85rem", color: usarInventario ? "#4ade80" : "rgba(255,255,255,0.7)" }}>
+                    <input type="checkbox" checked={usarInventario} onChange={handleToggleUsarInventario} />
+                    📦 Usar cuenta del inventario
+                  </label>
+                  {usarInventario && (
+                    <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)" }}>
+                      {cuentasInventario.length} disponible{cuentasInventario.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+
+                {/* Correos seleccionados con contraseña / inventario */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                   <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
                     Correos seleccionados ({selectedEmailAddresses.length})
                   </label>
-                  <button type="button"
-                    onClick={() => {
-                      setBulkPasswordMode(prev => !prev);
-                      setBulkPasswordText("");
-                    }}
-                    style={{ fontSize: "0.72rem", padding: "2px 10px", borderRadius: 6,
-                      border: "1px solid rgba(255,255,255,0.15)", background: bulkPasswordMode ? "rgba(99,102,241,0.3)" : "transparent",
-                      color: bulkPasswordMode ? "#a5b4fc" : "rgba(255,255,255,0.5)", cursor: "pointer" }}>
-                    📋 {bulkPasswordMode ? "Modo individual" : "Pegar lista de claves"}
-                  </button>
+                  {!usarInventario && (
+                    <button type="button"
+                      onClick={() => {
+                        setBulkPasswordMode(prev => !prev);
+                        setBulkPasswordText("");
+                      }}
+                      style={{ fontSize: "0.72rem", padding: "2px 10px", borderRadius: 6,
+                        border: "1px solid rgba(255,255,255,0.15)", background: bulkPasswordMode ? "rgba(99,102,241,0.3)" : "transparent",
+                        color: bulkPasswordMode ? "#a5b4fc" : "rgba(255,255,255,0.5)", cursor: "pointer" }}>
+                      📋 {bulkPasswordMode ? "Modo individual" : "Pegar lista de claves"}
+                    </button>
+                  )}
                 </div>
 
-                {bulkPasswordMode ? (
+                {usarInventario ? (
+                  /* ── Modo inventario: dropdown por correo ── */
+                  <div style={{
+                    background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.15)",
+                    borderRadius: 10, padding: "8px 10px", marginBottom: 14,
+                    maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
+                  }}>
+                    {!formAlquilerRapido.plataforma && (
+                      <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", margin: 0 }}>
+                        Selecciona una plataforma para ver las cuentas disponibles.
+                      </p>
+                    )}
+                    {formAlquilerRapido.plataforma && loadingInventario && (
+                      <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", margin: 0 }}>Cargando cuentas...</p>
+                    )}
+                    {formAlquilerRapido.plataforma && !loadingInventario && cuentasInventario.length === 0 && (
+                      <p style={{ fontSize: "0.78rem", color: "#fbbf24", margin: 0 }}>
+                        ⚠️ No hay cuentas disponibles de {formAlquilerRapido.plataforma} en el inventario.
+                      </p>
+                    )}
+                    {formAlquilerRapido.plataforma && !loadingInventario && cuentasInventario.length > 0 && selectedEmailAddresses.map((c) => (
+                      <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: "0.78rem", color: "#a5b4fc", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          📧 {c}
+                        </span>
+                        <select
+                          value={inventarioSeleccionado[c] || ""}
+                          onChange={(e) => setInventarioSeleccionado(prev => ({ ...prev, [c]: e.target.value ? Number(e.target.value) : "" }))}
+                          style={{
+                            width: 200, padding: "4px 8px", borderRadius: 6, flexShrink: 0,
+                            background: "rgba(255,255,255,0.06)", color: "white",
+                            border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.75rem",
+                          }}
+                        >
+                          <option value="">Selecciona cuenta...</option>
+                          {cuentasInventario
+                            .filter((cuenta) => {
+                              // No mostrar cuentas ya asignadas a otro correo en este modal
+                              const asignadaAOtro = Object.entries(inventarioSeleccionado).some(
+                                ([otroCorreo, invId]) => otroCorreo !== c && invId === cuenta.id
+                              );
+                              return !asignadaAOtro;
+                            })
+                            .map((cuenta) => (
+                              <option key={cuenta.id} value={cuenta.id}>
+                                {cuenta.correo} {cuenta.proveedor ? `(${cuenta.proveedor})` : ""}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    ))}
+
+                    {/* Preview de asuntos que se asignarán */}
+                    {formAlquilerRapido.plataforma && asuntosPreview.length > 0 && (
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                        <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.5)", margin: "0 0 4px" }}>
+                          📨 Asuntos que se asignarán automáticamente:
+                        </p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {asuntosPreview.map((s) => (
+                            <span key={s.id} style={{ fontSize: "0.7rem", padding: "2px 8px", borderRadius: 10, background: "rgba(99,102,241,0.15)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.25)" }}>
+                              {s.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {formAlquilerRapido.plataforma && asuntosPreview.length === 0 && !loadingInventario && (
+                      <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.35)", margin: "8px 0 0" }}>
+                        No hay asuntos guardados para "{formAlquilerRapido.plataforma}" — puedes asignarlos después manualmente.
+                      </p>
+                    )}
+                  </div>
+                ) : bulkPasswordMode ? (
                   /* Modo lista bulk */
                   <div style={{ marginBottom: 14 }}>
                     <textarea
@@ -1413,9 +1578,13 @@ function Users() {
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setFormAlquilerRapido({ ...formAlquilerRapido, plataforma: p.nombre });
                         setShowNuevaPlataformaRapida(false);
+                        setInventarioSeleccionado({});
+                        if (usarInventario) {
+                          await loadInventarioYAsuntos(p.nombre);
+                        }
                       }}
                       style={{
                         padding: "4px 12px",
