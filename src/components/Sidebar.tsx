@@ -49,6 +49,8 @@ function Sidebar({ isOpen }: SidebarProps) {
     ...(user.role === "admin" ? [
       { to: "/users", icon: "👥", label: t("sidebar.users") },
       { to: "/rentals", icon: "🎬", label: "Alquileres" },
+      { to: "/inventario", icon: "📦", label: "Inventario" },      // ← AGREGAR ESTA LÍNEA
+      { to: "/precios", icon: "💰", label: "Precios" },            // ← AGREGAR ESTA LÍNEA
       { to: "/dashboard", icon: "📊", label: "Actividad" },
       { to: "/security", icon: "🔒", label: "Seguridad" },
     ] : []),

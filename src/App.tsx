@@ -9,7 +9,9 @@ import AuthorizedEmails from "./pages/AuthorizedEmails";
 import Profile from "./pages/Profile";
 import Layout from "./components/Layout";
 import Users from "./pages/Users";
-import Rentals from "./pages/Rentals";   // ← NUEVO
+import Rentals from "./pages/Rentals";
+import Inventory from "./pages/Inventory";        // ← AGREGAR ESTA LÍNEA
+import Prices from "./pages/Prices";              // ← AGREGAR ESTA LÍNEA
 import SecurityLogs from "./pages/SecurityLogs";
 import Dashboard from "./pages/Dashboard";
 
@@ -51,7 +53,9 @@ function App() {
             <Route path="authorizedEmails" element={<AuthorizedEmails />} />
             <Route path="/users" element={<Users />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="rentals" element={<Rentals />} />   {/* ← NUEVO */}
+            <Route path="rentals" element={<Rentals />} />
+            <Route path="inventario" element={<Inventory />} />      // ← AGREGAR ESTA LÍNEA
+            <Route path="precios" element={<Prices />} />            // ← AGREGAR ESTA LÍNEA
             <Route path="security" element={<SecurityLogs />} />
             <Route path="dashboard" element={<Dashboard />} />
           </Route>
