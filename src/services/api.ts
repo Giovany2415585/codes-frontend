@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://onlinebox.lat/api";
+const API_BASE_URL = "https://onlinebox.lat";
 
 export const apiFetch = async (
   endpoint: string,
