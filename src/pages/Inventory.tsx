@@ -123,11 +123,20 @@ function Inventory() {
     }
   };
 
-  const handleEdit = (item: InventarioItem) => {
-    setFormData(item);
-    setEditingId(item.id);
-    setShowForm(true);
-  };
+ const handleEdit = (item: InventarioItem) => {
+  setFormData({
+    correo: item.correo,
+    password: item.password,
+    plataforma: item.plataforma,
+    proveedor: item.proveedor || "",
+    correo_password: item.correo_password || "",
+    correo_verificacion: item.correo_verificacion || "",
+    facturacion: item.facturacion || "",
+    notas: item.notas || "",
+  });
+  setEditingId(item.id);
+  setShowForm(true);
+};
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("¿Eliminar esta cuenta?")) return;
