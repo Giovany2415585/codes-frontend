@@ -137,8 +137,11 @@ function Prices() {
 
   const handleSendPaymentMethod = async (id: number, method: "binance" | "llave") => {
     try {
-      const endpoint = method === "binance" ? `${id}/send-binance` : `${id}/send-llave`;
-      await apiFetch(`/api/admin/precios/${endpoint}`, { method: "POST", body: JSON.stringify({}) });
+      const endpoint = method === "binance" ? "send-binance" : "send-llave";
+      await apiFetch(`/api/admin/precios/${id}/${endpoint}`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
       toast.success(`Método de pago ${method === "binance" ? "Binance" : "LLAVE"} enviado a Telegram`);
     } catch {
       toast.error("Error enviando método de pago");
@@ -149,7 +152,14 @@ function Prices() {
     <div className="prices-page">
       <div className="prices-header">
         <h1>💰 Precios</h1>
-        <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setFormData({ producto: "", precio_cop: "", precio_usdt: "", tipo_cuenta: "" }); }}>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setShowForm(true);
+            setEditingId(null);
+            setFormData({ producto: "", precio_cop: "", precio_usdt: "", tipo_cuenta: "" });
+          }}
+        >
           ➕ Agregar producto
         </button>
       </div>
@@ -190,17 +200,11 @@ function Prices() {
       )}
 
       <div className="prices-actions">
-        <button
-          className="btn-telegram"
-          onClick={() => handleSendToTelegram()}
-        >
+        <button className="btn-telegram" onClick={() => handleSendToTelegram()}>
           📢 Enviar todos los precios
         </button>
         {selectedIds.size > 0 && (
-          <button
-            className="btn-telegram"
-            onClick={() => handleSendToTelegram(Array.from(selectedIds))}
-          >
+          <button className="btn-telegram" onClick={() => handleSendToTelegram(Array.from(selectedIds))}>
             📢 Enviar {selectedIds.size} seleccionado(s)
           </button>
         )}
@@ -242,8 +246,12 @@ function Prices() {
                   <td>${precio.precio_usdt}</td>
                   <td>{precio.tipo_cuenta || "-"}</td>
                   <td style={{ display: "flex", gap: "4px" }}>
-                    <button onClick={() => handleEdit(precio)} title="Editar">✎</button>
-                    <button onClick={() => handleDelete(precio.id)} title="Eliminar">✕</button>
+                    <button onClick={() => handleEdit(precio)} title="Editar">
+                      ✎
+                    </button>
+                    <button onClick={() => handleDelete(precio.id)} title="Eliminar">
+                      ✕
+                    </button>
                     <button
                       className="btn-binance"
                       onClick={() => handleSendPaymentMethod(precio.id, "binance")}
