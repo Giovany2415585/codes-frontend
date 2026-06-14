@@ -15,6 +15,8 @@ interface InventarioItem {
   estado: "Disponible" | "Ocupada" | "Caída";
   alquiler_id?: number;
   notas?: string;
+  cliente_nombre?: string;
+  dias_restantes?: number;
 }
 
 function Inventory() {
@@ -527,6 +529,7 @@ function Inventory() {
                 <th>Correo</th>
                 <th>Plataforma</th>
                 <th>Estado</th>
+                <th>Cliente</th>
                 <th>Proveedor</th>
                 <th>Facturación</th>
                 <th>Acciones</th>
@@ -548,6 +551,28 @@ function Inventory() {
                     {item.estado === "Disponible" && "🟢 Disponible"}
                     {item.estado === "Ocupada" && "🔴 Ocupada"}
                     {item.estado === "Caída" && "🟡 Caída"}
+                  </td>
+                  <td>
+                    {item.estado === "Ocupada" && item.cliente_nombre ? (
+                      <span style={{ fontSize: "0.8rem" }}>
+                        👤 {item.cliente_nombre}
+                        {item.dias_restantes !== undefined && item.dias_restantes !== null && (
+                          <>
+                            {" · "}
+                            <span style={{
+                              color: item.dias_restantes < 0 ? "#f87171" : item.dias_restantes <= 3 ? "#fbbf24" : "#4ade80",
+                              fontWeight: 600,
+                            }}>
+                              {item.dias_restantes < 0
+                                ? `Vencido (${Math.abs(item.dias_restantes)}d)`
+                                : `${item.dias_restantes}d`}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td>{item.proveedor || "-"}</td>
                   <td>{item.facturacion || "-"}</td>
