@@ -1542,7 +1542,7 @@ function Users() {
                             Marca una o varias cuentas. Por cada una se creará un alquiler y se agregará el correo automáticamente.
                           </p>
                           {cuentasInventario.map((cuenta) => (
-                            <label key={cuenta.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: "#a5b4fc", cursor: "pointer", padding: "2px 0" }}>
+                            <label key={cuenta.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: "#a5b4fc", cursor: "pointer", padding: "4px 2px" }}>
                               <input
                                 type="checkbox"
                                 checked={inventarioIdsElegidos.has(cuenta.id)}
@@ -1554,8 +1554,9 @@ function Users() {
                                     return next;
                                   });
                                 }}
+                                style={{ width: 16, height: 16, flexShrink: 0, margin: 0 }}
                               />
-                              📧 {cuenta.correo} {cuenta.proveedor ? <span style={{ color: "rgba(255,255,255,0.4)" }}>({cuenta.proveedor})</span> : ""}
+                              <span>📧 {cuenta.correo} {cuenta.proveedor ? <span style={{ color: "rgba(255,255,255,0.4)" }}>({cuenta.proveedor})</span> : ""}</span>
                             </label>
                           ))}
                         </>
