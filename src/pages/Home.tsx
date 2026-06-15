@@ -66,6 +66,12 @@ function Home() {
 
   const [currentIndex, setCurrentIndex] = useState(visibleSlides);
   const [isTransitioning, setIsTransitioning] = useState(true);
+  const [carouselSweep, setCarouselSweep] = useState(false);
+
+  const triggerCarouselSweep = () => {
+    setCarouselSweep(true);
+    setTimeout(() => setCarouselSweep(false), 900);
+  };
 
   const extendedProducts = [
     ...products.slice(-visibleSlides),
@@ -75,10 +81,12 @@ function Home() {
 
   const nextSlide = () => {
     setCurrentIndex((prev) => prev + 1);
+    triggerCarouselSweep();
   };
 
   const prevSlide = () => {
     setCurrentIndex((prev) => prev - 1);
+    triggerCarouselSweep();
   };
 
   useEffect(() => {
@@ -308,6 +316,7 @@ function Home() {
           </button>
 
           <div className="carousel">
+            {carouselSweep && <div className="plans-sweep" />}
             <div
               className="carousel-track"
               onTransitionEnd={handleTransitionEnd}
