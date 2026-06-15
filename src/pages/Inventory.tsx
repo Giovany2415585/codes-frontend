@@ -46,6 +46,7 @@ function Inventory() {
     correo_verificacion: "",
     facturacion: "",
     notas: "",
+    estado: "Disponible" as "Disponible" | "Ocupada" | "Caída",
   });
 
   const plataformas = [
@@ -134,6 +135,7 @@ function Inventory() {
         correo_verificacion: "",
         facturacion: "",
         notas: "",
+        estado: "Disponible",
       });
       loadInventario();
     } catch (err: any) {
@@ -151,6 +153,7 @@ function Inventory() {
     correo_verificacion: item.correo_verificacion || "",
     facturacion: item.facturacion || "",
     notas: item.notas || "",
+    estado: item.estado,
   });
   setEditingId(item.id);
   setShowPassword(false);
@@ -285,7 +288,7 @@ function Inventory() {
           <button className="btn-primary" onClick={() => setShowBulkForm(true)}>
             📥 Carga masiva
           </button>
-          <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setShowPassword(false); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "" }); }}>
+          <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setShowPassword(false); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "", estado: "Disponible" }); }}>
             ➕ Agregar cuenta
           </button>
         </div>
@@ -389,6 +392,25 @@ function Inventory() {
               value={formData.facturacion}
               onChange={(e) => setFormData({ ...formData, facturacion: e.target.value })}
             />
+
+            {editingId && (
+              <>
+                <label style={fieldLabelStyle}>Estado</label>
+                <select
+                  value={formData.estado}
+                  onChange={(e) => setFormData({ ...formData, estado: e.target.value as "Disponible" | "Ocupada" | "Caída" })}
+                >
+                  <option value="Disponible">🟢 Disponible</option>
+                  <option value="Ocupada">🔴 Ocupada</option>
+                  <option value="Caída">🟡 Caída</option>
+                </select>
+                {formData.estado === "Disponible" && (
+                  <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", margin: "4px 0 0" }}>
+                    Al guardar como "Disponible", esta cuenta podrá asignarse a un nuevo cliente.
+                  </p>
+                )}
+              </>
+            )}
 
             <label style={fieldLabelStyle}>Notas</label>
             <textarea
