@@ -101,7 +101,7 @@ function Rentals() {
   const [gruposTablaAbiertos, setGruposTablaAbiertos] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "crear" | "editar" | "renovar" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | null
+    "crear" | "editar" | "renovar" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | "cortar" | null
   >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
@@ -373,7 +373,9 @@ function Rentals() {
       (r.correo || "").toLowerCase().includes(searchText.toLowerCase());
     const matchEstado =
       filterEstado === "todos" ||
-      (filterEstado === "vencer" ? r.dias_restantes >= 0 && r.dias_restantes <= 3 : r.estado === filterEstado);
+      (filterEstado === "vencer" ? r.dias_restantes >= 0 && r.dias_restantes <= 3 :
+       filterEstado === "vencido" ? r.dias_restantes < 0 :
+       r.estado === filterEstado);
     const matchCliente =
       filterCliente === "" || r.user_id === parseInt(filterCliente);
     return matchSearch && matchEstado && matchCliente;
@@ -632,6 +634,28 @@ function Rentals() {
     }
   };
 
+  const handleCortarAlquiler = async (estadoInventario: "Caída" | "Disponible") => {
+    if (!selectedRental) return;
+    try {
+      await apiFetch(`/api/alquileres/${selectedRental.id}?estado_inventario=${encodeURIComponent(estadoInventario)}`, {
+        method: "DELETE",
+      });
+      toast.success(
+        estadoInventario === "Caída"
+          ? "✂️ Alquiler cortado — cuenta marcada como Caída"
+          : "✂️ Alquiler cortado — cuenta liberada (Disponible)"
+      );
+      setShowModal(false);
+      await loadRentals();
+      const remaining = rentals.filter(
+        (r) => r.user_id === selectedClient && r.id !== selectedRental.id
+      );
+      if (remaining.length === 0) setSelectedClient(null);
+    } catch {
+      toast.error("Error cortando el alquiler");
+    }
+  };
+
   const openModal = (type: typeof modalType, rental?: Rental, data?: any) => {
     setModalType(type);
     setSelectedRental(rental || null);
@@ -677,6 +701,7 @@ function Rentals() {
 
   const totalActivos = rentals.filter((r) => r.estado === "activo").length;
   const totalVencer = rentals.filter((r) => r.dias_restantes >= 0 && r.dias_restantes <= 3).length;
+  const totalVencidos = rentals.filter((r) => r.dias_restantes < 0).length;
   const totalPendiente = rentals.filter((r) => r.pago_estado === "pendiente").length;
 
   return (
@@ -687,6 +712,16 @@ function Rentals() {
           <div className="rentals-stats">
             <span className="stat-chip activo">{totalActivos} activos</span>
             <span className="stat-chip urgente">{totalVencer} por vencer</span>
+            {totalVencidos > 0 && (
+              <span
+                className="stat-chip vencido"
+                style={{ cursor: "pointer" }}
+                onClick={() => setFilterEstado("vencido")}
+                title="Ver alquileres vencidos (clic para filtrar)"
+              >
+                ✂️ {totalVencidos} vencido{totalVencidos > 1 ? "s" : ""} — pendiente de corte
+              </span>
+            )}
             <span className="stat-chip pendiente">{totalPendiente} pago pendiente</span>
           </div>
         </div>
@@ -994,6 +1029,9 @@ function Rentals() {
                                   <button className="btn-icon editar" title="Editar" onClick={(e) => { e.stopPropagation(); openModal("editar", r); }}>✏️</button>
                                   <button className="btn-icon renovar" title="Renovar" onClick={(e) => { e.stopPropagation(); openModal("renovar", r); }}>↻</button>
                                   <button className="btn-icon garantia" title="Garantía" onClick={(e) => { e.stopPropagation(); openModal("garantia", r); }}>🛡️</button>
+                                  {r.dias_restantes < 0 && (
+                                    <button className="btn-icon cortar" title="Cortar (vencido)" onClick={(e) => { e.stopPropagation(); openModal("cortar", r); }}>✂️</button>
+                                  )}
                                   <button className="btn-icon delete" title="Eliminar" onClick={(e) => { e.stopPropagation(); openModal("delete", r); }}>✕</button>
                                 </div>
                               </div>
@@ -1521,6 +1559,44 @@ function Rentals() {
                 </p>
                 <div className="modal-actions">
                   <button className="btn-danger" onClick={handleDeleteRental}>Eliminar</button>
+                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                </div>
+              </>
+            )}
+
+            {/* MODAL CORTAR ALQUILER VENCIDO */}
+            {modalType === "cortar" && (
+              <>
+                <h3>✂️ Cortar alquiler vencido</h3>
+                <p className="modal-subtitle">
+                  {selectedRental?.plataforma}
+                  {selectedRental?.correo && ` — ${selectedRental.correo}`}
+                  {selectedRental && selectedRental.dias_restantes < 0 && (
+                    <span style={{ color: "#f87171" }}> ({Math.abs(selectedRental.dias_restantes)}d vencido)</span>
+                  )}
+                </p>
+                <div style={{
+                  background: "rgba(248,113,113,0.1)",
+                  border: "1px solid rgba(248,113,113,0.3)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  marginBottom: 14,
+                  fontSize: "0.82rem",
+                  color: "rgba(255,255,255,0.6)",
+                }}>
+                  Se eliminará el alquiler, se quitará el acceso del cliente (correo y asuntos autorizados)
+                  y la cuenta del inventario quedará según elijas abajo.
+                </div>
+                <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", marginBottom: 8 }}>
+                  ¿Cómo queda la cuenta del inventario?
+                </p>
+                <div className="modal-actions" style={{ flexDirection: "column", gap: 8 }}>
+                  <button className="btn-primary" onClick={() => handleCortarAlquiler("Disponible")}>
+                    🟢 Liberar — queda Disponible para otro cliente
+                  </button>
+                  <button className="btn-danger" onClick={() => handleCortarAlquiler("Caída")}>
+                    🟡 Marcar como Caída — revisar antes de reasignar
+                  </button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
