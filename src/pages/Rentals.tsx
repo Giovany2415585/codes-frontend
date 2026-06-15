@@ -58,6 +58,15 @@ interface MetodoPago {
   nombre: string;
 }
 
+interface InventarioCuenta {
+  id: number;
+  correo: string;
+  password: string;
+  plataforma: string;
+  proveedor?: string;
+  estado: string;
+}
+
 function addDays(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day);
@@ -145,6 +154,12 @@ function Rentals() {
     notas: "",
   });
   const [formResolver, setFormResolver] = useState({ cuenta_reemplazo: "", notas: "" });
+
+  // ── Inventario para Garantía ────────────────────────────────────────────────
+  const [usarInventarioGarantia, setUsarInventarioGarantia] = useState(false);
+  const [cuentasInventarioGarantia, setCuentasInventarioGarantia] = useState<InventarioCuenta[]>([]);
+  const [inventarioSeleccionadoGarantia, setInventarioSeleccionadoGarantia] = useState<number | "">("");
+  const [loadingInventarioGarantia, setLoadingInventarioGarantia] = useState(false);
 
   useEffect(() => {
     loadRentals();
@@ -528,20 +543,54 @@ function Rentals() {
     }
   };
 
+  const handleToggleUsarInventarioGarantia = async () => {
+    const next = !usarInventarioGarantia;
+    setUsarInventarioGarantia(next);
+    setInventarioSeleccionadoGarantia("");
+    if (next && selectedRental?.plataforma) {
+      setLoadingInventarioGarantia(true);
+      try {
+        const cuentas = await apiFetch(`/api/admin/inventario/disponibles/${encodeURIComponent(selectedRental.plataforma)}`);
+        setCuentasInventarioGarantia(cuentas);
+      } catch {
+        setCuentasInventarioGarantia([]);
+        toast.error("Error cargando cuentas del inventario");
+      } finally {
+        setLoadingInventarioGarantia(false);
+      }
+    } else {
+      setCuentasInventarioGarantia([]);
+    }
+  };
+
   const handleRegistrarGarantia = async () => {
     if (!selectedRental) return;
-    if (!formGarantia.correo_nuevo?.trim()) {
+
+    if (usarInventarioGarantia) {
+      if (!inventarioSeleccionadoGarantia) {
+        toast.error("Selecciona una cuenta del inventario");
+        return;
+      }
+    } else if (!formGarantia.correo_nuevo?.trim()) {
       toast.error("Ingresa el correo de reemplazo");
       return;
     }
+
     try {
       await apiFetch(`/api/alquileres/${selectedRental.id}/garantias`, {
         method: "POST",
-        body: JSON.stringify({
-          correo_nuevo: formGarantia.correo_nuevo,
-          password_nuevo: formGarantia.password_nuevo || null,
-          notas: formGarantia.notas,
-        }),
+        body: JSON.stringify(
+          usarInventarioGarantia
+            ? {
+                inventario_id: inventarioSeleccionadoGarantia,
+                notas: formGarantia.notas,
+              }
+            : {
+                correo_nuevo: formGarantia.correo_nuevo,
+                password_nuevo: formGarantia.password_nuevo || null,
+                notas: formGarantia.notas,
+              }
+        ),
       });
       toast.success("✅ Garantía aplicada — correo reemplazado");
       setShowModal(false);
@@ -608,7 +657,12 @@ function Rentals() {
     }
 
     if (type === "renovar") { setFormDias("30"); setFormRenovar({ precio: String(rental?.precio || ""), divisa: (rental as any)?.divisa || "COP" }); }
-    if (type === "garantia") setFormGarantia({ correo_nuevo: "", password_nuevo: "", notas: "" });
+    if (type === "garantia") {
+      setFormGarantia({ correo_nuevo: "", password_nuevo: "", notas: "" });
+      setUsarInventarioGarantia(false);
+      setCuentasInventarioGarantia([]);
+      setInventarioSeleccionadoGarantia("");
+    }
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
 
     setShowModal(true);
@@ -1294,26 +1348,88 @@ function Rentals() {
                   </div>
                 )}
 
-                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
-                  Correo de reemplazo *
-                </label>
-                <input
-                  type="email"
-                  placeholder="nuevo@gmail.com"
-                  value={formGarantia.correo_nuevo}
-                  onChange={(e) => setFormGarantia({ ...formGarantia, correo_nuevo: e.target.value })}
-                  autoFocus
-                />
-                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
-                  Contraseña del nuevo correo (opcional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: NexaVolt8841#"
-                  value={formGarantia.password_nuevo}
-                  onChange={(e) => setFormGarantia({ ...formGarantia, password_nuevo: e.target.value })}
-                  style={{ fontFamily: "monospace" }}
-                />
+                {/* ── TOGGLE USAR INVENTARIO ── */}
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
+                    background: usarInventarioGarantia ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${usarInventarioGarantia ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}`,
+                    borderRadius: 8, padding: "8px 12px", marginBottom: 12,
+                  }}
+                >
+                  <label style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "0.85rem", color: usarInventarioGarantia ? "#4ade80" : "rgba(255,255,255,0.7)", margin: 0, whiteSpace: "nowrap" }}>
+                    <input type="checkbox" checked={usarInventarioGarantia} onChange={handleToggleUsarInventarioGarantia} style={{ width: 16, height: 16, flexShrink: 0, margin: 0 }} />
+                    <span>📦 Usar cuenta del inventario</span>
+                  </label>
+                  {usarInventarioGarantia && (
+                    <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
+                      {cuentasInventarioGarantia.length} disponible{cuentasInventarioGarantia.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+
+                {usarInventarioGarantia ? (
+                  <div style={{
+                    background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.15)",
+                    borderRadius: 10, padding: "8px 10px", marginBottom: 14,
+                  }}>
+                    {loadingInventarioGarantia && (
+                      <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.4)", margin: 0 }}>Cargando cuentas...</p>
+                    )}
+                    {!loadingInventarioGarantia && cuentasInventarioGarantia.length === 0 && (
+                      <p style={{ fontSize: "0.78rem", color: "#fbbf24", margin: 0 }}>
+                        ⚠️ No hay cuentas disponibles de {selectedRental?.plataforma} en el inventario.
+                      </p>
+                    )}
+                    {!loadingInventarioGarantia && cuentasInventarioGarantia.length > 0 && (
+                      <>
+                        <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                          Cuenta de reemplazo *
+                        </label>
+                        <select
+                          value={inventarioSeleccionadoGarantia}
+                          onChange={(e) => setInventarioSeleccionadoGarantia(e.target.value ? Number(e.target.value) : "")}
+                          style={{
+                            width: "100%", padding: "8px 10px", borderRadius: 6,
+                            background: "rgba(255,255,255,0.06)", color: "white",
+                            border: "1px solid rgba(255,255,255,0.1)", fontSize: "0.85rem",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <option value="">Selecciona cuenta...</option>
+                          {cuentasInventarioGarantia.map((cuenta) => (
+                            <option key={cuenta.id} value={cuenta.id}>
+                              {cuenta.correo} {cuenta.proveedor ? `(${cuenta.proveedor})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                      Correo de reemplazo *
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="nuevo@gmail.com"
+                      value={formGarantia.correo_nuevo}
+                      onChange={(e) => setFormGarantia({ ...formGarantia, correo_nuevo: e.target.value })}
+                      autoFocus
+                    />
+                    <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
+                      Contraseña del nuevo correo (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: NexaVolt8841#"
+                      value={formGarantia.password_nuevo}
+                      onChange={(e) => setFormGarantia({ ...formGarantia, password_nuevo: e.target.value })}
+                      style={{ fontFamily: "monospace" }}
+                    />
+                  </>
+                )}
                 <textarea
                   placeholder="Notas (opcional)"
                   value={formGarantia.notas}
