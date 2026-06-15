@@ -453,7 +453,11 @@
 .plan-price-main {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: rgba(129, 140, 248, 0.12);
+  border: 1px solid rgba(129, 140, 248, 0.3);
 }
 
 .plan-price-currency {
