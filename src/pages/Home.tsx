@@ -92,7 +92,7 @@ function Home() {
   useEffect(() => {
     const interval = setInterval(() => {
       nextSlide();
-    }, 6000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
@@ -153,7 +153,7 @@ function Home() {
         setPlanesStartIndex((prev) => (prev + 1) % planes.length);
         setPlanesFade(true);
       }, 900);
-    }, 6000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [planes.length]);
