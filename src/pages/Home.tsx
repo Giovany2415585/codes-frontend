@@ -48,16 +48,14 @@ function Home() {
     },
   ];
 
-  const [visibleSlides, setVisibleSlides] = useState(3);
+  const [visibleSlides, setVisibleSlides] = useState(2);
 
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth <= 768) {
         setVisibleSlides(1);
-      } else if (window.innerWidth <= 1024) {
-        setVisibleSlides(2);
       } else {
-        setVisibleSlides(3);
+        setVisibleSlides(2);
       }
     };
 
@@ -321,7 +319,7 @@ function Home() {
                     rel="noopener noreferrer"
                     className="contact-btn telegram"
                   >
-Telegram
+                    Telegram
                   </a>
                 </div>
               </div>
