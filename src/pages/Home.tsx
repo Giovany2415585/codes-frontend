@@ -114,6 +114,8 @@ function Home() {
   // ── Planes / Precios (carrusel de productos en stock) ──────────────────────
   const [planes, setPlanes] = useState<Precio[]>([]);
   const [loadingPlanes, setLoadingPlanes] = useState(true);
+  const [planesStartIndex, setPlanesStartIndex] = useState(0);
+  const [planesFade, setPlanesFade] = useState(true);
 
   useEffect(() => {
     const loadPlanes = async () => {
@@ -130,6 +132,39 @@ function Home() {
     };
     loadPlanes();
   }, []);
+
+  // Ventana deslizante: muestra 2 planes a la vez, avanza de 1 en 1, cíclico
+  const PLANES_VISIBLE = 2;
+
+  useEffect(() => {
+    if (planes.length <= PLANES_VISIBLE) return;
+
+    const interval = setInterval(() => {
+      setPlanesFade(false);
+      setTimeout(() => {
+        setPlanesStartIndex((prev) => (prev + 1) % planes.length);
+        setPlanesFade(true);
+      }, 300);
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [planes.length]);
+
+  const goToPlanIndex = (index: number) => {
+    setPlanesFade(false);
+    setTimeout(() => {
+      setPlanesStartIndex(((index % planes.length) + planes.length) % planes.length);
+      setPlanesFade(true);
+    }, 300);
+  };
+
+  const nextPlan = () => goToPlanIndex(planesStartIndex + 1);
+  const prevPlan = () => goToPlanIndex(planesStartIndex - 1);
+
+  const visiblePlanes =
+    planes.length <= PLANES_VISIBLE
+      ? planes
+      : Array.from({ length: PLANES_VISIBLE }, (_, i) => planes[(planesStartIndex + i) % planes.length]);
 
   const formatCOP = (value: number) =>
     `$${Math.round(Number(value)).toLocaleString("es-CO")}`;
@@ -168,8 +203,15 @@ function Home() {
             <h2 className="plans-title">Planes disponibles ahora</h2>
           </div>
 
-          <div className="plans-grid">
-            {planes.map((plan) => {
+          <div className="plans-carousel-wrapper">
+            {planes.length > PLANES_VISIBLE && (
+              <button className="plans-arrow left" onClick={prevPlan} aria-label="Anterior">
+                ❮
+              </button>
+            )}
+
+            <div className={`plans-grid ${planesFade ? "plans-fade-in" : "plans-fade-out"}`}>
+              {visiblePlanes.map((plan) => {
               const features = getFeatureLines(plan.descripcion);
               const proveedor = getHighlight(plan.descripcion);
               return (
@@ -230,7 +272,26 @@ function Home() {
                 </div>
               );
             })}
+            </div>
+
+            {planes.length > PLANES_VISIBLE && (
+              <button className="plans-arrow right" onClick={nextPlan} aria-label="Siguiente">
+                ❯
+              </button>
+            )}
           </div>
+
+          {planes.length > PLANES_VISIBLE && (
+            <div className="plans-dots">
+              {planes.map((_, i) => (
+                <span
+                  key={i}
+                  className={`plans-dot ${i === planesStartIndex ? "active" : ""}`}
+                  onClick={() => goToPlanIndex(i)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

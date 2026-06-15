@@ -355,10 +355,85 @@
   animation: plans-title-shine 6s linear infinite;
 }
 
+.plans-carousel-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .plans-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
+  flex: 1;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.plans-fade-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.plans-fade-out {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.plans-arrow {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: rgba(129, 140, 248, 0.12);
+  color: #c7d2fe;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+}
+
+.plans-arrow:hover {
+  background: rgba(129, 140, 248, 0.25);
+  border-color: rgba(129, 140, 248, 0.6);
+  transform: scale(1.06);
+}
+
+.plans-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.plans-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.plans-dot.active {
+  background: linear-gradient(135deg, #818cf8, #22d3ee);
+  border-color: transparent;
+  transform: scale(1.25);
+}
+
+@media (max-width: 768px) {
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plans-arrow {
+    width: 38px;
+    height: 38px;
+    font-size: 1rem;
+  }
 }
 
 .plan-card {
