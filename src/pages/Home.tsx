@@ -152,8 +152,130 @@ function Home() {
       .slice(1);
   };
 
+  // Limpia bullets/emojis rotos al inicio del texto (incluye el carácter de
+  // reemplazo � que aparece cuando un emoji se corrompió al guardarse).
+  const cleanFeatureText = (text: string) => {
+    return text
+      .replace(/^[\s\u{1F000}-\u{1FFFF}\u{2000}-\u{3300}\uFFFD?❓🔘●○•\-\*]+/u, "")
+      .trim();
+  };
+
   return (
     <div className="home-container">
+      {/* ── PLANES Y PRECIOS DISPONIBLES (PRIMERO) ─────────────────────────── */}
+      {!loadingPlanes && planes.length > 0 && (
+        <div className="plans-container">
+          <div className="plans-header">
+            <span className="plans-badge">📦 Stock disponible</span>
+            <h2 className="plans-title">Planes disponibles ahora</h2>
+          </div>
+
+          <div className="plans-grid">
+            {planes.map((plan) => {
+              const features = getFeatureLines(plan.descripcion);
+              const proveedor = getHighlight(plan.descripcion);
+              return (
+                <div className="plan-card" key={plan.id}>
+                  <div className="plan-card-glow" />
+
+                  {plan.tipo_cuenta && (
+                    <span className="plan-tipo-badge">{plan.tipo_cuenta}</span>
+                  )}
+
+                  <h3 className="plan-name">{plan.producto}</h3>
+
+                  <div className="plan-price-row">
+                    <div className="plan-price-main">
+                      <span className="plan-price-currency">COP</span>
+                      <span className="plan-price-value">{formatCOP(plan.precio_cop)}</span>
+                    </div>
+                    <div className="plan-price-alt">
+                      ≈ ${plan.precio_usdt} USDT
+                    </div>
+                  </div>
+
+                  {proveedor && <p className="plan-highlight">{cleanFeatureText(proveedor)}</p>}
+
+                  {features.length > 0 && (
+                    <ul className="plan-features">
+                      {features.map((f, i) => (
+                        <li key={i}>
+                          <span className="plan-feature-icon">✓</span>
+                          <span>{cleanFeatureText(f)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="plan-cta-row">
+                    <a
+                      href={`https://wa.me/573185651516?text=${encodeURIComponent(
+                        `Hola, quiero contratar: ${plan.producto}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="plan-cta whatsapp"
+                    >
+                      <span className="plan-cta-icon">💬</span> Contratar por WhatsApp
+                    </a>
+                    <a
+                      href={`https://t.me/Cinebox_net?text=${encodeURIComponent(
+                        `Hola, quiero contratar: ${plan.producto}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="plan-cta telegram"
+                    >
+                      <span className="plan-cta-icon">✈️</span> Contratar por Telegram
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── CARRUSEL DE PLATAFORMAS ─────────────────────────────────────────── */}
+      <div className="products-container">
+        <h2 className="products-title">{t("home.platformsTitle")}</h2>
+
+        <div className="carousel-wrapper">
+          <button className="arrow left" onClick={prevSlide}>
+            ❮
+          </button>
+
+          <div className="carousel">
+            <div
+              className="carousel-track"
+              onTransitionEnd={handleTransitionEnd}
+              style={{
+                transform: `translateX(-${
+                  currentIndex * (100 / visibleSlides)
+                }%)`,
+                transition: isTransitioning
+                  ? "transform 0.6s cubic-bezier(.77,0,.18,1)"
+                  : "none",
+              }}
+            >
+              {extendedProducts.map((product, index) => (
+                <div className="carousel-item" key={index}>
+                  <img src={product.image} alt={product.title} />
+                  <h3>{product.description}</h3>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button className="arrow right" onClick={nextSlide}>
+            ❯
+          </button>
+        </div>
+
+        <p className="products-description">{t("home.availability")}</p>
+      </div>
+
+      {/* ── PANEL DE ADMINISTRACIÓN / INFO ──────────────────────────────────── */}
       <div className="home-card">
         <div className="home-top">
           <div className="home-left">
@@ -199,7 +321,7 @@ function Home() {
                     rel="noopener noreferrer"
                     className="contact-btn telegram"
                   >
-                    Telegram
+Telegram
                   </a>
                 </div>
               </div>
@@ -207,121 +329,6 @@ function Home() {
           </div>
         </div>
       </div>
-
-      <div className="products-container">
-        <h2 className="products-title">{t("home.platformsTitle")}</h2>
-
-        <div className="carousel-wrapper">
-          <button className="arrow left" onClick={prevSlide}>
-            ❮
-          </button>
-
-          <div className="carousel">
-            <div
-              className="carousel-track"
-              onTransitionEnd={handleTransitionEnd}
-              style={{
-                transform: `translateX(-${
-                  currentIndex * (100 / visibleSlides)
-                }%)`,
-                transition: isTransitioning
-                  ? "transform 0.6s cubic-bezier(.77,0,.18,1)"
-                  : "none",
-              }}
-            >
-              {extendedProducts.map((product, index) => (
-                <div className="carousel-item" key={index}>
-                  <img src={product.image} alt={product.title} />
-                  <h3>{product.description}</h3>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button className="arrow right" onClick={nextSlide}>
-            ❯
-          </button>
-        </div>
-
-        <p className="products-description">{t("home.availability")}</p>
-      </div>
-
-      {/* ── PLANES Y PRECIOS DISPONIBLES ───────────────────────────────────── */}
-      {!loadingPlanes && planes.length > 0 && (
-        <div className="plans-container">
-          <div className="plans-header">
-            <span className="plans-badge">📦 Stock disponible</span>
-            <h2 className="plans-title">Planes disponibles ahora</h2>
-            <p className="plans-subtitle">
-              Cuentas listas para activar de inmediato. Disponibilidad limitada.
-            </p>
-          </div>
-
-          <div className="plans-grid">
-            {planes.map((plan) => {
-              const highlight = getHighlight(plan.descripcion);
-              const features = getFeatureLines(plan.descripcion);
-              return (
-                <div className="plan-card" key={plan.id}>
-                  <div className="plan-card-glow" />
-                  <div className="plan-card-header">
-                    <h3 className="plan-name">{plan.producto}</h3>
-                    {plan.tipo_cuenta && (
-                      <span className="plan-tipo-badge">{plan.tipo_cuenta}</span>
-                    )}
-                  </div>
-
-                  <div className="plan-price-row">
-                    <div className="plan-price-main">
-                      <span className="plan-price-currency">COP</span>
-                      <span className="plan-price-value">{formatCOP(plan.precio_cop)}</span>
-                    </div>
-                    <div className="plan-price-alt">
-                      ≈ ${plan.precio_usdt} USDT
-                    </div>
-                  </div>
-
-                  {highlight && <p className="plan-highlight">{highlight}</p>}
-
-                  {features.length > 0 && (
-                    <ul className="plan-features">
-                      {features.map((f, i) => (
-                        <li key={i}>
-                          <span className="plan-feature-icon">✓</span>
-                          <span>{f.replace(/^[🔘●○•\-\*]\s*/, "")}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <div className="plan-cta-row">
-                    <a
-                      href={`https://wa.me/573185651516?text=${encodeURIComponent(
-                        `Hola, quiero contratar: ${plan.producto}`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="plan-cta whatsapp"
-                    >
-                      <span className="plan-cta-icon">💬</span> Contratar por WhatsApp
-                    </a>
-                    <a
-                      href={`https://t.me/Cinebox_net?text=${encodeURIComponent(
-                        `Hola, quiero contratar: ${plan.producto}`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="plan-cta telegram"
-                    >
-                      <span className="plan-cta-icon">✈️</span> Contratar por Telegram
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
