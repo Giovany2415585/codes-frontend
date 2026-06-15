@@ -120,7 +120,7 @@ function Home() {
   useEffect(() => {
     const loadPlanes = async () => {
       try {
-        const res = await fetch("/api/admin/precios/publico");
+        const res = await fetch("https://onlinebox.lat/api/admin/precios/publico");
         if (!res.ok) throw new Error("Error cargando planes");
         const data = await res.json();
         setPlanes(data);
