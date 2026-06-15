@@ -366,17 +366,20 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 24px;
   flex: 1;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.45s ease, transform 0.45s ease, filter 0.45s ease;
+  transform-origin: center top;
 }
 
 .plans-fade-in {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+  filter: blur(0px);
 }
 
 .plans-fade-out {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(18px) scale(0.97);
+  filter: blur(6px);
 }
 
 .plans-arrow {

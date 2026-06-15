@@ -144,7 +144,7 @@ function Home() {
       setTimeout(() => {
         setPlanesStartIndex((prev) => (prev + 1) % planes.length);
         setPlanesFade(true);
-      }, 300);
+      }, 450);
     }, 6000);
 
     return () => clearInterval(interval);
@@ -155,7 +155,7 @@ function Home() {
     setTimeout(() => {
       setPlanesStartIndex(((index % planes.length) + planes.length) % planes.length);
       setPlanesFade(true);
-    }, 300);
+    }, 450);
   };
 
   const nextPlan = () => goToPlanIndex(planesStartIndex + 1);
