@@ -210,8 +210,10 @@ function Home() {
               </button>
             )}
 
-            <div className={`plans-grid ${planesFade ? "plans-fade-in" : "plans-fade-out"}`}>
-              {visiblePlanes.map((plan) => {
+            <div className="plans-grid-wrapper">
+              {!planesFade && <div className="plans-sweep" />}
+              <div className={`plans-grid ${planesFade ? "plans-fade-in" : "plans-fade-out"}`}>
+                {visiblePlanes.map((plan) => {
               const features = getFeatureLines(plan.descripcion);
               const proveedor = getHighlight(plan.descripcion);
               return (
@@ -272,6 +274,7 @@ function Home() {
                 </div>
               );
             })}
+              </div>
             </div>
 
             {planes.length > PLANES_VISIBLE && (
