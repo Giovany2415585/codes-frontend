@@ -8,6 +8,15 @@ import img3 from "../assets/plataforma3.jpg";
 import img4 from "../assets/plataforma4.jpg";
 import img5 from "../assets/plataforma5.jpg";
 
+interface Precio {
+  id: number;
+  producto: string;
+  precio_cop: number;
+  precio_usdt: number;
+  tipo_cuenta?: string;
+  descripcion?: string;
+}
+
 function Home() {
   const { t } = useTranslation();
 
@@ -104,6 +113,45 @@ function Home() {
     }
   }, [isTransitioning]);
 
+  // ── Planes / Precios (carrusel de productos en stock) ──────────────────────
+  const [planes, setPlanes] = useState<Precio[]>([]);
+  const [loadingPlanes, setLoadingPlanes] = useState(true);
+
+  useEffect(() => {
+    const loadPlanes = async () => {
+      try {
+        const res = await fetch("/api/admin/precios/publico");
+        if (!res.ok) throw new Error("Error cargando planes");
+        const data = await res.json();
+        setPlanes(data);
+      } catch {
+        setPlanes([]);
+      } finally {
+        setLoadingPlanes(false);
+      }
+    };
+    loadPlanes();
+  }, []);
+
+  const formatCOP = (value: number) =>
+    `$${Math.round(Number(value)).toLocaleString("es-CO")}`;
+
+  // Extrae la primera línea "fuerte" de la descripción para mostrar como destacado
+  const getHighlight = (descripcion?: string) => {
+    if (!descripcion) return null;
+    const lines = descripcion.split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines[0] || null;
+  };
+
+  const getFeatureLines = (descripcion?: string) => {
+    if (!descripcion) return [];
+    return descripcion
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(1);
+  };
+
   return (
     <div className="home-container">
       <div className="home-card">
@@ -197,6 +245,83 @@ function Home() {
 
         <p className="products-description">{t("home.availability")}</p>
       </div>
+
+      {/* ── PLANES Y PRECIOS DISPONIBLES ───────────────────────────────────── */}
+      {!loadingPlanes && planes.length > 0 && (
+        <div className="plans-container">
+          <div className="plans-header">
+            <span className="plans-badge">📦 Stock disponible</span>
+            <h2 className="plans-title">Planes disponibles ahora</h2>
+            <p className="plans-subtitle">
+              Cuentas listas para activar de inmediato. Disponibilidad limitada.
+            </p>
+          </div>
+
+          <div className="plans-grid">
+            {planes.map((plan) => {
+              const highlight = getHighlight(plan.descripcion);
+              const features = getFeatureLines(plan.descripcion);
+              return (
+                <div className="plan-card" key={plan.id}>
+                  <div className="plan-card-glow" />
+                  <div className="plan-card-header">
+                    <h3 className="plan-name">{plan.producto}</h3>
+                    {plan.tipo_cuenta && (
+                      <span className="plan-tipo-badge">{plan.tipo_cuenta}</span>
+                    )}
+                  </div>
+
+                  <div className="plan-price-row">
+                    <div className="plan-price-main">
+                      <span className="plan-price-currency">COP</span>
+                      <span className="plan-price-value">{formatCOP(plan.precio_cop)}</span>
+                    </div>
+                    <div className="plan-price-alt">
+                      ≈ ${plan.precio_usdt} USDT
+                    </div>
+                  </div>
+
+                  {highlight && <p className="plan-highlight">{highlight}</p>}
+
+                  {features.length > 0 && (
+                    <ul className="plan-features">
+                      {features.map((f, i) => (
+                        <li key={i}>
+                          <span className="plan-feature-icon">✓</span>
+                          <span>{f.replace(/^[🔘●○•\-\*]\s*/, "")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="plan-cta-row">
+                    <a
+                      href={`https://wa.me/573185651516?text=${encodeURIComponent(
+                        `Hola, quiero contratar: ${plan.producto}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="plan-cta whatsapp"
+                    >
+                      <span className="plan-cta-icon">💬</span> Contratar por WhatsApp
+                    </a>
+                    <a
+                      href={`https://t.me/Cinebox_net?text=${encodeURIComponent(
+                        `Hola, quiero contratar: ${plan.producto}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="plan-cta telegram"
+                    >
+                      <span className="plan-cta-icon">✈️</span> Contratar por Telegram
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

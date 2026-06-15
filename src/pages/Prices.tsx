@@ -10,6 +10,7 @@ interface Precio {
   precio_usdt: number;
   tipo_cuenta?: string;
   descripcion?: string;
+  activo: number;
 }
 
 interface MetodoPago {
@@ -125,6 +126,26 @@ function Prices() {
       loadPrecios();
     } catch {
       toast.error("Error eliminando producto");
+    }
+  };
+
+  const handleToggleActivo = async (precio: Precio) => {
+    const nuevoEstado = !precio.activo;
+    try {
+      await apiFetch(`/api/admin/precios/${precio.id}/toggle`, {
+        method: "PUT",
+        body: JSON.stringify({ activo: nuevoEstado }),
+      });
+      setPrecios((prev) =>
+        prev.map((p) => (p.id === precio.id ? { ...p, activo: nuevoEstado ? 1 : 0 } : p))
+      );
+      toast.success(
+        nuevoEstado
+          ? `"${precio.producto}" ahora visible en el carrusel`
+          : `"${precio.producto}" oculto del carrusel`
+      );
+    } catch {
+      toast.error("Error actualizando visibilidad");
     }
   };
 
@@ -325,6 +346,7 @@ function Prices() {
                 <th>Precio USDT</th>
                 <th>Tipo de cuenta</th>
                 <th>Descripción</th>
+                <th>Visible</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -343,6 +365,38 @@ function Prices() {
                   <td>${precio.precio_usdt}</td>
                   <td>{precio.tipo_cuenta || "-"}</td>
                   <td style={{ whiteSpace: "pre-line", maxWidth: "300px" }}>{precio.descripcion || "-"}</td>
+                  <td>
+                    <button
+                      onClick={() => handleToggleActivo(precio)}
+                      title={precio.activo ? "Visible en el carrusel — clic para ocultar" : "Oculto del carrusel — clic para mostrar"}
+                      style={{
+                        border: "none",
+                        cursor: "pointer",
+                        borderRadius: "12px",
+                        padding: "4px 10px",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        background: precio.activo ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.08)",
+                        color: precio.activo ? "#4ade80" : "rgba(255,255,255,0.4)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: precio.activo ? "#4ade80" : "rgba(255,255,255,0.3)",
+                          display: "inline-block",
+                          flexShrink: 0,
+                        }}
+                      />
+                      {precio.activo ? "Visible" : "Oculto"}
+                    </button>
+                  </td>
                   <td style={{ display: "flex", gap: "4px" }}>
                     <button onClick={() => handleEdit(precio)} title="Editar">
                       ✎
