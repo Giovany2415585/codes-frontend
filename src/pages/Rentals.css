@@ -135,6 +135,21 @@
 
 .btn-eliminar-masivo:hover { background: rgba(239,68,68,0.28); }
 
+.btn-renovar-masivo {
+  background: rgba(129,140,248,0.15);
+  border: 1px solid rgba(129,140,248,0.35);
+  border-radius: 8px;
+  color: #a5b4fc;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.btn-renovar-masivo:hover { background: rgba(129,140,248,0.28); }
+
 /* ─── GRUPOS POR FECHA ─── */
 
 .fecha-grupo {

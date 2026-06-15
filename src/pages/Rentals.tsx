@@ -101,7 +101,7 @@ function Rentals() {
   const [gruposTablaAbiertos, setGruposTablaAbiertos] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "crear" | "editar" | "renovar" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | "cortar" | null
+    "crear" | "editar" | "renovar" | "renovarMasivo" | "pagoMasivo" | "deleteMasivo" | "garantia" | "resolver" | "delete" | "cortar" | null
   >(null);
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [modalData, setModalData] = useState<any>(null);
@@ -140,6 +140,7 @@ function Rentals() {
 
   const [formDias, setFormDias] = useState("30");
   const [formRenovar, setFormRenovar] = useState({ precio: "", divisa: "COP" });
+  const [formRenovarMasivo, setFormRenovarMasivo] = useState({ dias: "30", precio: "", divisa: "COP" });
   const [formPagoMasivo, setFormPagoMasivo] = useState({
     monto: "",
     divisa: "COP",
@@ -529,6 +530,35 @@ function Rentals() {
       loadRentals();
     } catch (err: any) {
       toast.error(err.message || "Error renovando");
+    }
+  };
+
+  const handleRenovarMasivo = async () => {
+    if (selectedCuentas.length === 0) return;
+    const dias = parseInt(formRenovarMasivo.dias);
+    if (!dias || dias <= 0) {
+      toast.error("Los días son obligatorios");
+      return;
+    }
+    try {
+      const body: any = { ids: selectedCuentas, dias };
+      if (formRenovarMasivo.precio) body.precio = parseFloat(formRenovarMasivo.precio);
+      if (formRenovarMasivo.divisa) body.divisa = formRenovarMasivo.divisa;
+
+      await apiFetch(`/api/alquileres/renovar-masivo`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+
+      toast.success(`${selectedCuentas.length} cuenta(s) renovada(s) por ${dias} días`);
+
+      setShowModal(false);
+      setSelectedCuentas([]);
+      setFormRenovarMasivo({ dias: "30", precio: "", divisa: "COP" });
+      if (selectedClient) refreshClientDetail(selectedClient);
+      loadRentals();
+    } catch (err: any) {
+      toast.error(err.message || "Error renovando cuentas");
     }
   };
 
@@ -938,6 +968,9 @@ function Rentals() {
                   </label>
                   {selectedCuentas.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
+                      <button className="btn-renovar-masivo" onClick={() => { setModalType("renovarMasivo"); setShowModal(true); }}>
+                        ↻ Renovar {selectedCuentas.length} seleccionada(s)
+                      </button>
                       <button className="btn-eliminar-masivo" onClick={() => { setModalType("deleteMasivo"); setShowModal(true); }}>
                         🗑 Eliminar {selectedCuentas.length} seleccionada(s)
                       </button>
@@ -1356,6 +1389,60 @@ function Rentals() {
                 </div>
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRenovar}>Renovar</button>
+                  <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                </div>
+              </>
+            )}
+
+            {/* MODAL RENOVAR MASIVO */}
+            {modalType === "renovarMasivo" && (
+              <>
+                <h3>↻ Renovar cuentas seleccionadas</h3>
+                <p className="modal-subtitle">{selectedCuentas.length} cuenta(s) seleccionada(s)</p>
+                <label>Días a extender (aplica a todas)</label>
+                <div className="dias-quick">
+                  {[7, 15, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      className={`dias-btn ${formRenovarMasivo.dias === String(d) ? "active" : ""}`}
+                      onClick={() => setFormRenovarMasivo({ ...formRenovarMasivo, dias: String(d) })}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  value={formRenovarMasivo.dias}
+                  onChange={(e) => setFormRenovarMasivo({ ...formRenovarMasivo, dias: e.target.value })}
+                  min="1"
+                />
+                <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", margin: "4px 0 0" }}>
+                  Cada cuenta extiende su propia fecha de vencimiento por {formRenovarMasivo.dias || 0} días.
+                </p>
+                <label style={{ marginTop: "10px", display: "block" }}>Precio (opcional — actualiza todas si se indica)</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="number"
+                    placeholder="Dejar vacío para no cambiar"
+                    value={formRenovarMasivo.precio}
+                    onChange={(e) => setFormRenovarMasivo({ ...formRenovarMasivo, precio: e.target.value })}
+                    style={{ flex: 1, padding: "8px 10px", borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontSize: "0.9rem", minWidth: 0, width: "100%" }}
+                  />
+                  <select
+                    className="divisa-select"
+                    value={formRenovarMasivo.divisa}
+                    onChange={(e) => setFormRenovarMasivo({ ...formRenovarMasivo, divisa: e.target.value })}
+                    style={{ width: 90, flexShrink: 0, padding: "8px 6px", borderRadius: 6, background: "#1e293b", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                  >
+                    <option value="COP">COP</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn-primary" onClick={handleRenovarMasivo}>
+                    Renovar {selectedCuentas.length} cuenta(s)
+                  </button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 </div>
               </>
