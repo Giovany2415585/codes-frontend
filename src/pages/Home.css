@@ -372,7 +372,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 24px;
-  transition: opacity 0.45s ease, transform 0.45s ease, filter 0.45s ease;
+  transition: opacity 0.9s ease, transform 0.9s ease, filter 0.9s ease;
   transform-origin: center top;
 }
 
