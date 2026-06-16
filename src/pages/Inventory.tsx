@@ -213,6 +213,23 @@ function Inventory() {
     }
   };
 
+  // ── NUEVO: eliminar masivo ────────────────────────────────────────────────
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`¿Eliminar ${selectedIds.size} cuenta(s) del inventario? Esta acción no se puede deshacer.`)) return;
+    try {
+      await apiFetch("/api/admin/inventario/bulk-delete", {
+        method: "DELETE",
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      toast.success(`${selectedIds.size} cuenta(s) eliminada(s)`);
+      setSelectedIds(new Set());
+      loadInventario();
+    } catch (err: any) {
+      toast.error(err.message || "Error eliminando cuentas");
+    }
+  };
+
   // Parsea el texto pegado (filas tipo Excel, separadas por TAB)
   // Orden esperado: correo | password | facturacion | correo_password | correo_verificacion
   const parseBulkText = () => {
@@ -531,6 +548,10 @@ function Inventory() {
             <option value="Ocupada">🔴 Ocupada</option>
             <option value="Caída">🟡 Caída</option>
           </select>
+          {/* ── NUEVO: botón eliminar masivo ── */}
+          <button className="btn-eliminar-masivo-inv" onClick={handleBulkDelete}>
+            🗑 Eliminar {selectedIds.size} seleccionada(s)
+          </button>
         </div>
       )}
 
