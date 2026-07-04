@@ -213,7 +213,7 @@ function Inventory() {
     }
   };
 
-  // ── NUEVO: eliminar masivo ────────────────────────────────────────────────
+  // ── Eliminar masivo ───────────────────────────────────────────────────────
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`¿Eliminar ${selectedIds.size} cuenta(s) del inventario? Esta acción no se puede deshacer.`)) return;
@@ -228,6 +228,40 @@ function Inventory() {
     } catch (err: any) {
       toast.error(err.message || "Error eliminando cuentas");
     }
+  };
+
+  // ── Exportar CSV ──────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const headers = ["ID", "Correo", "Password", "Plataforma", "Proveedor", "Correo Password", "Correo Verificacion", "Facturacion", "Estado", "Cliente", "Notas"];
+    const escape = (val: any) => {
+      const str = val == null ? "" : String(val);
+      return str.includes(",") || str.includes('"') || str.includes("\n")
+        ? `"${str.replace(/"/g, '""')}"`
+        : str;
+    };
+    const rows = items.map((item) => [
+      item.id,
+      item.correo,
+      item.password,
+      item.plataforma,
+      item.proveedor || "",
+      item.correo_password || "",
+      item.correo_verificacion || "",
+      item.facturacion || "",
+      item.estado,
+      item.cliente_nombre || "",
+      item.notas || "",
+    ].map(escape).join(","));
+
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `inventario_cinebox_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${items.length} cuentas exportadas`);
   };
 
   // Parsea el texto pegado (filas tipo Excel, separadas por TAB)
@@ -302,6 +336,9 @@ function Inventory() {
       <div className="inventory-header">
         <h1>📦 Inventario</h1>
         <div style={{ display: "flex", gap: "8px" }}>
+          <button className="btn-primary" onClick={handleExportCSV}>
+            📊 Exportar CSV
+          </button>
           <button className="btn-primary" onClick={() => setShowBulkForm(true)}>
             📥 Carga masiva
           </button>
