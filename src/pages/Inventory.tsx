@@ -217,27 +217,34 @@ function Inventory() {
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = ["ID", "Correo", "Password", "Plataforma", "Proveedor", "Correo Password", "Correo Verificacion", "Facturacion", "Estado", "Cliente", "Notas"];
-    const escape = (val: any) => {
-      const str = val == null ? "" : String(val);
-      return str.includes(",") || str.includes('"') || str.includes("\n")
-        ? `"${str.replace(/"/g, '""')}"` : str;
-    };
-    const rows = allItems.map((item) => [
-      item.id, item.correo, item.password, item.plataforma,
-      item.proveedor || "", item.correo_password || "", item.correo_verificacion || "",
-      item.facturacion || "", item.estado, item.cliente_nombre || "", item.notas || "",
-    ].map(escape).join(","));
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `inventario_cinebox_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success(`${allItems.length} cuentas exportadas`);
+  const handleExportCSV = async () => {
+    try {
+      toast.loading("Preparando exportación...", { id: "export" });
+      const data = await apiFetch(`/api/admin/inventario?page=1&limit=5000`);
+      const exportItems = data.data || [];
+      const headers = ["ID", "Correo", "Password", "Plataforma", "Proveedor", "Correo Password", "Correo Verificacion", "Facturacion", "Estado", "Cliente", "Notas"];
+      const escape = (val: any) => {
+        const str = val == null ? "" : String(val);
+        return str.includes(',') || str.includes('"') || str.includes('\n')
+          ? `"${str.replace(/"/g, '""`)}"` : str;
+      };
+      const rows = exportItems.map((item: InventarioItem) => [
+        item.id, item.correo, item.password, item.plataforma,
+        item.proveedor || "", item.correo_password || "", item.correo_verificacion || "",
+        item.facturacion || "", item.estado, item.cliente_nombre || "", item.notas || "",
+      ].map(escape).join(","));
+      const csv = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `inventario_cinebox_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${exportItems.length} cuentas exportadas`, { id: "export" });
+    } catch {
+      toast.error("Error exportando inventario", { id: "export" });
+    }
   };
 
   const parseBulkText = () => {
