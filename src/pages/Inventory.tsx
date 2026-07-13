@@ -23,7 +23,6 @@ const LIMIT = 50;
 
 function Inventory() {
   const [items, setItems] = useState<InventarioItem[]>([]);
-  const [allItems, setAllItems] = useState<InventarioItem[]>([]); // para export CSV y resumen
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,10 +30,12 @@ function Inventory() {
   const [plataformaFilter, setPlataformaFilter] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [searchTimer, setSearchTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [disponibles, setDisponibles] = useState<Record<string, number>>({});
 
   const [showBulkForm, setShowBulkForm] = useState(false);
   const [bulkPlataforma, setBulkPlataforma] = useState("");
@@ -62,29 +63,25 @@ function Inventory() {
 
   useEffect(() => {
     loadInventario(1);
-    loadAllItems();
+    loadDisponiblesResumen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     loadInventario(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plataformaFilter, estadoFilter]);
 
-  // Para búsqueda de texto: filtrar sobre los items cargados en la página actual
-  const filteredItems = searchText
-    ? items.filter(
-        (item) =>
-          item.correo.toLowerCase().includes(searchText.toLowerCase()) ||
-          (item.notas?.toLowerCase().includes(searchText.toLowerCase()) || false)
-      )
-    : items;
-
-  const loadInventario = async (page: number) => {
+  const loadInventario = async (page: number, searchOverride?: string) => {
     setLoading(true);
     try {
+      const search = searchOverride !== undefined ? searchOverride : searchText;
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
       if (plataformaFilter) params.append("plataforma", plataformaFilter);
       if (estadoFilter) params.append("estado", estadoFilter);
-      const data = await apiFetch(`/api/admin/inventario?${params}`);
+      if (search) params.append("search", search);
+
+      const data = await apiFetch("/api/admin/inventario?" + params.toString());
       setItems(data.data);
       setTotal(data.total);
       setTotalPages(data.totalPages);
@@ -97,22 +94,28 @@ function Inventory() {
     }
   };
 
-  // Carga todos los items solo para el export CSV y resumen de disponibles
-  const loadAllItems = async () => {
+  const loadDisponiblesResumen = async () => {
     try {
-      const data = await apiFetch(`/api/admin/inventario?page=1&limit=9999`);
-      setAllItems(data.data);
+      const data = await apiFetch("/api/admin/inventario?page=1&limit=5000&estado=Disponible");
+      const list: InventarioItem[] = data.data || [];
+      const acc: Record<string, number> = {};
+      list.forEach((item) => {
+        acc[item.plataforma] = (acc[item.plataforma] || 0) + 1;
+      });
+      setDisponibles(acc);
     } catch {
-      // silencioso
+      // silencioso, no bloquea la pagina
     }
   };
 
-  const disponiblesPorPlataforma = allItems
-    .filter((item) => item.estado === "Disponible")
-    .reduce((acc: Record<string, number>, item) => {
-      acc[item.plataforma] = (acc[item.plataforma] || 0) + 1;
-      return acc;
-    }, {});
+  const handleSearchChange = (value: string) => {
+    setSearchText(value);
+    if (searchTimer) clearTimeout(searchTimer);
+    const timer = setTimeout(() => {
+      loadInventario(1, value);
+    }, 400);
+    setSearchTimer(timer);
+  };
 
   const handleAddOrEdit = async () => {
     if (!formData.correo || !formData.password || !formData.plataforma) {
@@ -121,7 +124,7 @@ function Inventory() {
     }
     try {
       if (editingId) {
-        await apiFetch(`/api/admin/inventario/${editingId}`, {
+        await apiFetch("/api/admin/inventario/" + editingId, {
           method: "PUT",
           body: JSON.stringify(formData),
         });
@@ -136,9 +139,19 @@ function Inventory() {
       setShowForm(false);
       setEditingId(null);
       setShowPassword(false);
-      setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "", estado: "Disponible" });
+      setFormData({
+        correo: "",
+        password: "",
+        plataforma: "",
+        proveedor: "",
+        correo_password: "",
+        correo_verificacion: "",
+        facturacion: "",
+        notas: "",
+        estado: "Disponible",
+      });
       loadInventario(currentPage);
-      loadAllItems();
+      loadDisponiblesResumen();
     } catch (err: any) {
       toast.error(err.message || "Error guardando cuenta");
     }
@@ -164,35 +177,48 @@ function Inventory() {
   const handleDelete = async (id: number) => {
     if (!window.confirm("¿Eliminar esta cuenta?")) return;
     try {
-      await apiFetch(`/api/admin/inventario/${id}`, { method: "DELETE" });
+      await apiFetch("/api/admin/inventario/" + id, { method: "DELETE" });
       toast.success("Cuenta eliminada");
       loadInventario(currentPage);
-      loadAllItems();
+      loadDisponiblesResumen();
     } catch {
       toast.error("Error eliminando cuenta");
     }
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(new Set(filteredItems.map((item) => item.id)));
-    else setSelectedIds(new Set());
+    if (checked) {
+      setSelectedIds(new Set(items.map((item) => item.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
   };
 
   const handleSelectOne = (id: number, checked: boolean) => {
     const newSelected = new Set(selectedIds);
-    if (checked) newSelected.add(id);
-    else newSelected.delete(id);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
     setSelectedIds(newSelected);
   };
 
   const handleBulkUpdate = async (field: string, value: string) => {
-    if (selectedIds.size === 0) { toast.error("Selecciona al menos una cuenta"); return; }
+    if (selectedIds.size === 0) {
+      toast.error("Selecciona al menos una cuenta");
+      return;
+    }
     try {
       await apiFetch("/api/admin/inventario/bulk/update", {
         method: "PUT",
-        body: JSON.stringify({ ids: Array.from(selectedIds), field, value }),
+        body: JSON.stringify({
+          ids: Array.from(selectedIds),
+          field,
+          value,
+        }),
       });
-      toast.success(`${selectedIds.size} cuenta(s) actualizada(s)`);
+      toast.success(selectedIds.size + " cuenta(s) actualizada(s)");
       setSelectedIds(new Set());
       loadInventario(currentPage);
     } catch {
@@ -202,46 +228,66 @@ function Inventory() {
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`¿Eliminar ${selectedIds.size} cuenta(s) del inventario? Esta acción no se puede deshacer.`)) return;
+    const confirmMsg = "¿Eliminar " + selectedIds.size + " cuenta(s) del inventario? Esta acción no se puede deshacer.";
+    if (!window.confirm(confirmMsg)) return;
     try {
       await apiFetch("/api/admin/inventario/bulk-delete", {
         method: "DELETE",
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
       });
-      toast.success(`${selectedIds.size} cuenta(s) eliminada(s)`);
+      toast.success(selectedIds.size + " cuenta(s) eliminada(s)");
       setSelectedIds(new Set());
       loadInventario(currentPage);
-      loadAllItems();
+      loadDisponiblesResumen();
     } catch (err: any) {
       toast.error(err.message || "Error eliminando cuentas");
     }
   };
 
+  const csvEscape = (val: any): string => {
+    const str = val === null || val === undefined ? "" : String(val);
+    const needsQuotes = str.indexOf(",") !== -1 || str.indexOf('"') !== -1 || str.indexOf("\n") !== -1;
+    if (needsQuotes) {
+      return '"' + str.split('"').join('""') + '"';
+    }
+    return str;
+  };
+
   const handleExportCSV = async () => {
     try {
       toast.loading("Preparando exportación...", { id: "export" });
-      const data = await apiFetch(`/api/admin/inventario?page=1&limit=5000`);
-      const exportItems = data.data || [];
+      const data = await apiFetch("/api/admin/inventario?page=1&limit=5000");
+      const exportItems: InventarioItem[] = data.data || [];
+
       const headers = ["ID", "Correo", "Password", "Plataforma", "Proveedor", "Correo Password", "Correo Verificacion", "Facturacion", "Estado", "Cliente", "Notas"];
-      const escape = (val: any) => {
-        const str = val == null ? "" : String(val);
-        return str.includes(',') || str.includes('"') || str.includes('\n')
-          ? `"${str.replace(/"/g, '""`)}"` : str;
-      };
-      const rows = exportItems.map((item: InventarioItem) => [
-        item.id, item.correo, item.password, item.plataforma,
-        item.proveedor || "", item.correo_password || "", item.correo_verificacion || "",
-        item.facturacion || "", item.estado, item.cliente_nombre || "", item.notas || "",
-      ].map(escape).join(","));
-      const csv = [headers.join(","), ...rows].join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const rowLines: string[] = [];
+      for (const item of exportItems) {
+        const cols = [
+          item.id,
+          item.correo,
+          item.password,
+          item.plataforma,
+          item.proveedor || "",
+          item.correo_password || "",
+          item.correo_verificacion || "",
+          item.facturacion || "",
+          item.estado,
+          item.cliente_nombre || "",
+          item.notas || "",
+        ];
+        rowLines.push(cols.map(csvEscape).join(","));
+      }
+
+      const csvContent = [headers.join(","), ...rowLines].join("\n");
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `inventario_cinebox_${new Date().toISOString().slice(0, 10)}.csv`;
+      const fecha = new Date().toISOString().slice(0, 10);
+      link.download = "inventario_cinebox_" + fecha + ".csv";
       link.click();
       URL.revokeObjectURL(url);
-      toast.success(`${exportItems.length} cuentas exportadas`, { id: "export" });
+      toast.success(exportItems.length + " cuentas exportadas", { id: "export" });
     } catch {
       toast.error("Error exportando inventario", { id: "export" });
     }
@@ -251,30 +297,48 @@ function Inventory() {
     const lines = bulkText.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
     return lines.map((line) => {
       const cols = line.split("\t").map((c) => c.trim());
-      return { correo: cols[0] || "", password: cols[1] || "", facturacion: cols[2] || "", correo_password: cols[3] || "", correo_verificacion: cols[4] || "" };
+      return {
+        correo: cols[0] || "",
+        password: cols[1] || "",
+        facturacion: cols[2] || "",
+        correo_password: cols[3] || "",
+        correo_verificacion: cols[4] || "",
+      };
     });
   };
 
   const bulkPreview = bulkText.trim() ? parseBulkText() : [];
 
   const handleBulkCreate = async () => {
-    if (!bulkPlataforma) { toast.error("Selecciona la plataforma"); return; }
+    if (!bulkPlataforma) {
+      toast.error("Selecciona la plataforma");
+      return;
+    }
     const rows = parseBulkText();
-    if (rows.length === 0) { toast.error("Pega al menos una fila"); return; }
+    if (rows.length === 0) {
+      toast.error("Pega al menos una fila");
+      return;
+    }
     setBulkSubmitting(true);
     try {
       const result = await apiFetch("/api/admin/inventario/bulk/create", {
         method: "POST",
-        body: JSON.stringify({ plataforma: bulkPlataforma, proveedor: bulkProveedor || null, rows }),
+        body: JSON.stringify({
+          plataforma: bulkPlataforma,
+          proveedor: bulkProveedor || null,
+          rows,
+        }),
       });
       toast.success(result.message || "Cuentas agregadas");
-      if (result.errores && result.errores.length > 0) result.errores.forEach((e: string) => toast.error(e));
+      if (result.errores && result.errores.length > 0) {
+        result.errores.forEach((e: string) => toast.error(e));
+      }
       setShowBulkForm(false);
       setBulkPlataforma("");
       setBulkProveedor("");
       setBulkText("");
       loadInventario(1);
-      loadAllItems();
+      loadDisponiblesResumen();
     } catch (err: any) {
       toast.error(err.message || "Error en carga masiva");
     } finally {
@@ -282,29 +346,67 @@ function Inventory() {
     }
   };
 
-  const fieldLabelStyle: React.CSSProperties = { fontSize: "0.75rem", opacity: 0.6, marginBottom: "2px", marginTop: "8px", display: "block" };
+  const fieldLabelStyle: React.CSSProperties = {
+    fontSize: "0.75rem",
+    opacity: 0.6,
+    marginBottom: "2px",
+    marginTop: "8px",
+    display: "block",
+  };
 
   return (
     <div className="inventory-page">
       <div className="inventory-header">
         <h1>📦 Inventario</h1>
         <div style={{ display: "flex", gap: "8px" }}>
-          <button className="btn-primary" onClick={handleExportCSV}>📊 Exportar CSV</button>
-          <button className="btn-primary" onClick={() => setShowBulkForm(true)}>📥 Carga masiva</button>
-          <button className="btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setShowPassword(false); setFormData({ correo: "", password: "", plataforma: "", proveedor: "", correo_password: "", correo_verificacion: "", facturacion: "", notas: "", estado: "Disponible" }); }}>
+          <button className="btn-primary" onClick={handleExportCSV}>
+            📊 Exportar CSV
+          </button>
+          <button className="btn-primary" onClick={() => setShowBulkForm(true)}>
+            📥 Carga masiva
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              setShowForm(true);
+              setEditingId(null);
+              setShowPassword(false);
+              setFormData({
+                correo: "",
+                password: "",
+                plataforma: "",
+                proveedor: "",
+                correo_password: "",
+                correo_verificacion: "",
+                facturacion: "",
+                notas: "",
+                estado: "Disponible",
+              });
+            }}
+          >
             ➕ Agregar cuenta
           </button>
         </div>
       </div>
 
-      {/* Resumen de disponibilidad por plataforma */}
-      {Object.keys(disponiblesPorPlataforma).length > 0 && (
+      {Object.keys(disponibles).length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", fontSize: "0.8rem" }}>
-          {Object.entries(disponiblesPorPlataforma).sort((a, b) => a[0].localeCompare(b[0])).map(([plataforma, count]) => (
-            <span key={plataforma} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "999px", padding: "4px 10px", opacity: 0.85 }}>
-              {plataforma}: <b>{count}</b> 🟢
-            </span>
-          ))}
+          {Object.entries(disponibles)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([plataforma, count]) => (
+              <span
+                key={plataforma}
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "999px",
+                  padding: "4px 10px",
+                  opacity: 0.85,
+                }}
+              >
+                {plataforma}: <b>{count}</b> 🟢
+              </span>
+            ))}
         </div>
       )}
 
@@ -312,39 +414,99 @@ function Inventory() {
         <div className="modal-overlay">
           <div className="modal">
             <h2>{editingId ? "Editar cuenta" : "Agregar cuenta"}</h2>
+
             <label style={fieldLabelStyle}>Correo</label>
-            <input placeholder="Correo" value={formData.correo} onChange={(e) => setFormData({ ...formData, correo: e.target.value })} />
+            <input
+              placeholder="Correo"
+              value={formData.correo}
+              onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+            />
+
             <label style={fieldLabelStyle}>Contraseña</label>
             <div style={{ display: "flex", gap: "6px" }}>
-              <input type={showPassword ? "text" : "password"} placeholder="Contraseña" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} style={{ flex: 1 }} />
-              <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ padding: "0 12px" }}>{showPassword ? "🙈" : "👁"}</button>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Contraseña"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                title={showPassword ? "Ocultar" : "Mostrar"}
+                style={{ padding: "0 12px" }}
+              >
+                {showPassword ? "🙈" : "👁"}
+              </button>
             </div>
+
             <label style={fieldLabelStyle}>Plataforma</label>
-            <select value={formData.plataforma} onChange={(e) => setFormData({ ...formData, plataforma: e.target.value })}>
+            <select
+              value={formData.plataforma}
+              onChange={(e) => setFormData({ ...formData, plataforma: e.target.value })}
+            >
               <option value="">Selecciona plataforma</option>
-              {plataformas.map((p) => <option key={p} value={p}>{p}</option>)}
+              {plataformas.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
+
             <label style={fieldLabelStyle}>Proveedor</label>
-            <input placeholder="Proveedor" value={formData.proveedor} onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })} />
+            <input
+              placeholder="Proveedor"
+              value={formData.proveedor}
+              onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+            />
+
             <label style={fieldLabelStyle}>Contraseña del correo</label>
-            <input placeholder="Contraseña del correo" value={formData.correo_password} onChange={(e) => setFormData({ ...formData, correo_password: e.target.value })} />
+            <input
+              placeholder="Contraseña del correo"
+              value={formData.correo_password}
+              onChange={(e) => setFormData({ ...formData, correo_password: e.target.value })}
+            />
+
             <label style={fieldLabelStyle}>Correo de verificación</label>
-            <input placeholder="Correo de verificación" value={formData.correo_verificacion} onChange={(e) => setFormData({ ...formData, correo_verificacion: e.target.value })} />
+            <input
+              placeholder="Correo de verificación"
+              value={formData.correo_verificacion}
+              onChange={(e) => setFormData({ ...formData, correo_verificacion: e.target.value })}
+            />
+
             <label style={fieldLabelStyle}>Facturación</label>
-            <input placeholder="Facturación (ej: Mensual, Anual)" value={formData.facturacion} onChange={(e) => setFormData({ ...formData, facturacion: e.target.value })} />
+            <input
+              placeholder="Facturación (ej: Mensual, Anual)"
+              value={formData.facturacion}
+              onChange={(e) => setFormData({ ...formData, facturacion: e.target.value })}
+            />
+
             {editingId && (
               <>
                 <label style={fieldLabelStyle}>Estado</label>
-                <select value={formData.estado} onChange={(e) => setFormData({ ...formData, estado: e.target.value as "Disponible" | "Ocupada" | "Caída" })}>
+                <select
+                  value={formData.estado}
+                  onChange={(e) =>
+                    setFormData({ ...formData, estado: e.target.value as "Disponible" | "Ocupada" | "Caída" })
+                  }
+                >
                   <option value="Disponible">🟢 Disponible</option>
                   <option value="Ocupada">🔴 Ocupada</option>
                   <option value="Caída">🟡 Caída</option>
                 </select>
-                {formData.estado === "Disponible" && <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", margin: "4px 0 0" }}>Al guardar como "Disponible", esta cuenta podrá asignarse a un nuevo cliente.</p>}
+                {formData.estado === "Disponible" && (
+                  <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", margin: "4px 0 0" }}>
+                    Al guardar como "Disponible", esta cuenta podrá asignarse a un nuevo cliente.
+                  </p>
+                )}
               </>
             )}
+
             <label style={fieldLabelStyle}>Notas</label>
-            <textarea placeholder="Notas" value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} />
+            <textarea
+              placeholder="Notas"
+              value={formData.notas}
+              onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+            />
             <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
               <button onClick={handleAddOrEdit}>Guardar</button>
               <button onClick={() => setShowForm(false)}>Cancelar</button>
@@ -357,29 +519,49 @@ function Inventory() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: "700px" }}>
             <h2>📥 Carga masiva de cuentas</h2>
+
             <label style={fieldLabelStyle}>Plataforma (para todo el lote)</label>
             <select value={bulkPlataforma} onChange={(e) => setBulkPlataforma(e.target.value)}>
               <option value="">Selecciona plataforma</option>
-              {plataformas.map((p) => <option key={p} value={p}>{p}</option>)}
+              {plataformas.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
+
             <label style={fieldLabelStyle}>Proveedor (para todo el lote, opcional)</label>
-            <input placeholder="Proveedor" value={bulkProveedor} onChange={(e) => setBulkProveedor(e.target.value)} />
+            <input
+              placeholder="Proveedor"
+              value={bulkProveedor}
+              onChange={(e) => setBulkProveedor(e.target.value)}
+            />
+
             <p style={{ fontSize: "0.85rem", opacity: 0.7, margin: "8px 0" }}>
-              Pega las filas copiadas desde Excel/Sheets. Columnas en este orden, separadas por TAB:<br />
+              Pega las filas copiadas desde Excel/Sheets. Columnas en este orden, separadas por TAB:
+              <br />
               <b>Correo | Contraseña | Facturación | Pass Correo | Correo Verificación</b>
             </p>
+
             <textarea
               placeholder={"TheobaldGrotz73@hotmail.com\tJac123123.\tBIN\t11usuario11\tcinebox.pnet@gmail.com\nKarynaEdris9164@hotmail.com\tJac123123\tBIN\t11usuario11\tcinebox.pnet@gmail.com"}
-              value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={8} style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              rows={8}
+              style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
             />
+
             {bulkPreview.length > 0 && (
               <p style={{ fontSize: "0.85rem", opacity: 0.8 }}>
                 {bulkPreview.length} cuenta(s) detectada(s)
-                {bulkPreview.some((r) => !r.correo || !r.password) && <span style={{ color: "#f87171" }}> — hay filas incompletas (sin correo o contraseña)</span>}
+                {bulkPreview.some((r) => !r.correo || !r.password) && (
+                  <span style={{ color: "#f87171" }}> — hay filas incompletas (sin correo o contraseña)</span>
+                )}
               </p>
             )}
+
             <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={handleBulkCreate} disabled={bulkSubmitting}>{bulkSubmitting ? "Agregando..." : `Agregar ${bulkPreview.length || ""} cuenta(s)`}</button>
+              <button onClick={handleBulkCreate} disabled={bulkSubmitting}>
+                {bulkSubmitting ? "Agregando..." : "Agregar " + (bulkPreview.length || "") + " cuenta(s)"}
+              </button>
               <button onClick={() => setShowBulkForm(false)}>Cancelar</button>
             </div>
           </div>
@@ -389,7 +571,9 @@ function Inventory() {
       <div className="inventory-filters">
         <select value={plataformaFilter} onChange={(e) => setPlataformaFilter(e.target.value)}>
           <option value="">Todas las plataformas</option>
-          {plataformas.map((p) => <option key={p} value={p}>{p}</option>)}
+          {plataformas.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
         </select>
         <select value={estadoFilter} onChange={(e) => setEstadoFilter(e.target.value)}>
           <option value="">Todos los estados</option>
@@ -397,19 +581,41 @@ function Inventory() {
           <option value="Ocupada">🔴 Ocupada</option>
           <option value="Caída">🟡 Caída</option>
         </select>
-        <input type="text" placeholder="Buscar correo..." value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+        <input
+          type="text"
+          placeholder="Buscar correo..."
+          value={searchText}
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
       </div>
 
       {selectedIds.size > 0 && (
         <div className="bulk-actions">
           <span>{selectedIds.size} seleccionada(s)</span>
-          <input type="password" placeholder="Nueva contraseña" id="newPassword"
-            onKeyPress={(e) => { if (e.key === "Enter") { const input = e.currentTarget as HTMLInputElement; if (input.value) handleBulkUpdate("password", input.value); } }}
+          <input
+            type="password"
+            placeholder="Nueva contraseña"
+            id="newPassword"
+            onKeyPress={(e) => {
+              if (e.key === "Enter") {
+                const input = e.currentTarget as HTMLInputElement;
+                if (input.value) handleBulkUpdate("password", input.value);
+              }
+            }}
           />
-          <button onClick={() => { const input = document.getElementById("newPassword") as HTMLInputElement; if (input.value) handleBulkUpdate("password", input.value); }}>
+          <button
+            onClick={() => {
+              const input = document.getElementById("newPassword") as HTMLInputElement;
+              if (input.value) handleBulkUpdate("password", input.value);
+            }}
+          >
             Actualizar contraseña
           </button>
-          <select onChange={(e) => { if (e.target.value) handleBulkUpdate("estado", e.target.value); }}>
+          <select
+            onChange={(e) => {
+              if (e.target.value) handleBulkUpdate("estado", e.target.value);
+            }}
+          >
             <option value="">Cambiar estado</option>
             <option value="Disponible">🟢 Disponible</option>
             <option value="Ocupada">🔴 Ocupada</option>
@@ -430,8 +636,9 @@ function Inventory() {
               <thead>
                 <tr>
                   <th>
-                    <input type="checkbox"
-                      checked={selectedIds.size === filteredItems.length && filteredItems.length > 0}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === items.length && items.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                     />
                   </th>
@@ -445,9 +652,15 @@ function Inventory() {
                 </tr>
               </thead>
               <tbody>
-                {filteredItems.map((item) => (
+                {items.map((item) => (
                   <tr key={item.id}>
-                    <td><input type="checkbox" checked={selectedIds.has(item.id)} onChange={(e) => handleSelectOne(item.id, e.target.checked)} /></td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={(e) => handleSelectOne(item.id, e.target.checked)}
+                      />
+                    </td>
                     <td>{item.correo}</td>
                     <td>{item.plataforma}</td>
                     <td>
@@ -460,12 +673,29 @@ function Inventory() {
                         <span style={{ fontSize: "0.8rem" }}>
                           👤 {item.cliente_nombre}
                           {item.dias_restantes !== undefined && item.dias_restantes !== null && (
-                            <>{" · "}<span style={{ color: item.dias_restantes < 0 ? "#f87171" : item.dias_restantes <= 3 ? "#fbbf24" : "#4ade80", fontWeight: 600 }}>
-                              {item.dias_restantes < 0 ? `Vencido (${Math.abs(item.dias_restantes)}d)` : `${item.dias_restantes}d`}
-                            </span></>
+                            <>
+                              {" · "}
+                              <span
+                                style={{
+                                  color:
+                                    item.dias_restantes < 0
+                                      ? "#f87171"
+                                      : item.dias_restantes <= 3
+                                      ? "#fbbf24"
+                                      : "#4ade80",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {item.dias_restantes < 0
+                                  ? "Vencido (" + Math.abs(item.dias_restantes) + "d)"
+                                  : item.dias_restantes + "d"}
+                              </span>
+                            </>
                           )}
                         </span>
-                      ) : "-"}
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td>{item.proveedor || "-"}</td>
                     <td>{item.facturacion || "-"}</td>
@@ -479,11 +709,16 @@ function Inventory() {
             </table>
           </div>
 
-          {/* Paginación */}
           <div className="pagination">
-            <button onClick={() => loadInventario(currentPage - 1)} disabled={currentPage === 1}>← Anterior</button>
-            <span>Página {currentPage} de {totalPages} · {total} cuentas en total</span>
-            <button onClick={() => loadInventario(currentPage + 1)} disabled={currentPage === totalPages}>Siguiente →</button>
+            <button onClick={() => loadInventario(currentPage - 1)} disabled={currentPage === 1}>
+              ← Anterior
+            </button>
+            <span>
+              Página {currentPage} de {totalPages} · {total} cuentas en total
+            </span>
+            <button onClick={() => loadInventario(currentPage + 1)} disabled={currentPage === totalPages}>
+              Siguiente →
+            </button>
           </div>
         </>
       )}
