@@ -196,7 +196,7 @@ function Codes() {
             <p className="date">{selectedEmail.date}</p>
             <iframe
               className="email-iframe"
-              sandbox=""
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
               title="Email preview"
               srcDoc={`
     <!DOCTYPE html>
