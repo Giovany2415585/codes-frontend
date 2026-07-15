@@ -153,6 +153,7 @@ function Rentals() {
     correo_nuevo: "",
     password_nuevo: "",
     notas: "",
+    dias_adicionales: "0",
   });
   const [formResolver, setFormResolver] = useState({ cuenta_reemplazo: "", notas: "" });
 
@@ -623,11 +624,13 @@ function Rentals() {
             ? {
                 inventario_id: inventarioSeleccionadoGarantia,
                 notas: formGarantia.notas,
+                dias_adicionales: parseInt(formGarantia.dias_adicionales) || 0,
               }
             : {
                 correo_nuevo: formGarantia.correo_nuevo,
                 password_nuevo: formGarantia.password_nuevo || null,
                 notas: formGarantia.notas,
+                dias_adicionales: parseInt(formGarantia.dias_adicionales) || 0,
               }
         ),
       });
@@ -726,7 +729,7 @@ function Rentals() {
 
     if (type === "renovar") { setFormDias("30"); setFormRenovar({ precio: String(rental?.precio || ""), divisa: (rental as any)?.divisa || "COP" }); }
     if (type === "garantia") {
-      setFormGarantia({ correo_nuevo: "", password_nuevo: "", notas: "" });
+      setFormGarantia({ correo_nuevo: "", password_nuevo: "", notas: "", dias_adicionales: "0" });
       setUsarInventarioGarantia(false);
       setCuentasInventarioGarantia([]);
       setInventarioSeleccionadoGarantia("");
@@ -1559,6 +1562,34 @@ function Rentals() {
                     />
                   </>
                 )}
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4, marginTop: 8 }}>
+                  Días adicionales por demora (opcional)
+                </label>
+                <div className="dias-quick">
+                  {[0, 1, 2, 3].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className={`dias-btn ${formGarantia.dias_adicionales === String(d) ? "active" : ""}`}
+                      onClick={() => setFormGarantia({ ...formGarantia, dias_adicionales: String(d) })}
+                    >
+                      {d === 0 ? "Sin extra" : `+${d}d`}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={formGarantia.dias_adicionales}
+                  onChange={(e) => setFormGarantia({ ...formGarantia, dias_adicionales: e.target.value })}
+                  min="0"
+                />
+                {parseInt(formGarantia.dias_adicionales) > 0 && selectedRental && (
+                  <p style={{ fontSize: "0.78rem", color: "#a5b4fc", margin: 0 }}>
+                    📅 Nueva fecha de corte: <b>{formatDate(addDays(selectedRental.fecha_fin.split("T")[0], parseInt(formGarantia.dias_adicionales) || 0))}</b>
+                  </p>
+                )}
+
                 <textarea
                   placeholder="Notas (opcional)"
                   value={formGarantia.notas}
@@ -1567,6 +1598,7 @@ function Rentals() {
                 />
                 <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", margin: "4px 0 12px" }}>
                   El correo caído será reemplazado y los asuntos asignados se transferirán al nuevo.
+                  {parseInt(formGarantia.dias_adicionales) > 0 && " La fecha de vencimiento se extenderá para compensar el tiempo de demora."}
                 </p>
                 <div className="modal-actions">
                   <button className="btn-primary" onClick={handleRegistrarGarantia}>Aplicar garantía</button>
