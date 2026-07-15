@@ -156,6 +156,12 @@ function Rentals() {
   });
   const [formResolver, setFormResolver] = useState({ cuenta_reemplazo: "", notas: "" });
 
+  // ── Opciones al eliminar (individual o masivo): estado del inventario + nueva contraseña ──
+  const [formDeleteOptions, setFormDeleteOptions] = useState({
+    estado_inventario: "Disponible" as "Disponible" | "Caída",
+    new_password: "",
+  });
+
   // ── Inventario para Garantía ────────────────────────────────────────────────
   const [usarInventarioGarantia, setUsarInventarioGarantia] = useState(false);
   const [cuentasInventarioGarantia, setCuentasInventarioGarantia] = useState<InventarioCuenta[]>([]);
@@ -270,14 +276,18 @@ function Rentals() {
   const handleEliminarMasivo = async () => {
     if (selectedCuentas.length === 0) return;
     try {
-      // Bulk — una sola notificación Telegram
       await apiFetch("/api/alquileres/bulk-delete", {
         method: "DELETE",
-        body: JSON.stringify({ ids: selectedCuentas }),
+        body: JSON.stringify({
+          ids: selectedCuentas,
+          estado_inventario: formDeleteOptions.estado_inventario,
+          new_password: formDeleteOptions.new_password || undefined,
+        }),
       });
       toast.success(`${selectedCuentas.length} cuenta(s) eliminada(s)`);
       setShowModal(false);
       setSelectedCuentas([]);
+      setFormDeleteOptions({ estado_inventario: "Disponible", new_password: "" });
       await loadRentals();
       if (selectedClient) refreshClientDetail(selectedClient);
     } catch (err: any) {
@@ -318,14 +328,12 @@ function Rentals() {
       .map((line) => line.trim())
       .filter((line) => line.length > 0 && line.includes("@"))
       .map((line) => {
-        // Separar por tab, múltiples espacios o punto y coma
         const parts = line.split(/\t|;|  +/).map(p => p.trim()).filter(Boolean);
         const correo = parts[0]?.toLowerCase() || "";
         const password = parts[1] || null;
         return { correo, password };
       })
       .filter((item) => item.correo.includes("@") && item.correo.includes("."));
-    // Deduplicar por correo
     const seen = new Set();
     const unique = parsed.filter(item => {
       if (seen.has(item.correo)) return false;
@@ -349,7 +357,6 @@ function Rentals() {
     }
   };
 
-  // ── Resumen cliente → Telegram ─────────────────────────────────────────────
   const handleEnviarResumen = async (userId: number) => {
     setEnviandoResumen(true);
     try {
@@ -651,9 +658,16 @@ function Rentals() {
   const handleDeleteRental = async () => {
     if (!selectedRental) return;
     try {
-      await apiFetch(`/api/alquileres/${selectedRental.id}`, { method: "DELETE" });
+      await apiFetch(`/api/alquileres/${selectedRental.id}`, {
+        method: "DELETE",
+        body: JSON.stringify({
+          estado_inventario: formDeleteOptions.estado_inventario,
+          new_password: formDeleteOptions.new_password || undefined,
+        }),
+      });
       toast.success("Alquiler eliminado");
       setShowModal(false);
+      setFormDeleteOptions({ estado_inventario: "Disponible", new_password: "" });
       await loadRentals();
       const remaining = rentals.filter(
         (r) => r.user_id === selectedClient && r.id !== selectedRental.id
@@ -718,6 +732,9 @@ function Rentals() {
       setInventarioSeleccionadoGarantia("");
     }
     if (type === "resolver") setFormResolver({ cuenta_reemplazo: "", notas: "" });
+    if (type === "delete" || type === "deleteMasivo") {
+      setFormDeleteOptions({ estado_inventario: "Disponible", new_password: "" });
+    }
 
     setShowModal(true);
   };
@@ -900,7 +917,6 @@ function Rentals() {
           </table>
         </div>
 
-        {/* ─── PANEL DE DETALLE DEL CLIENTE ─── */}
         {selectedClient && clientInfo && (
           <div className="rental-detail">
             <div className="detail-header">
@@ -914,7 +930,6 @@ function Rentals() {
                 <span className="detail-email">{clientInfo.cliente_email}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                {/* ── Botón resumen Telegram ── */}
                 <button
                   onClick={() => handleEnviarResumen(selectedClient)}
                   disabled={enviandoResumen}
@@ -950,7 +965,6 @@ function Rentals() {
               </div>
             </div>
 
-            {/* TAB CUENTAS */}
             {activeTab === "cuentas" && (
               <div className="detail-list">
                 <div className="cuentas-toolbar">
@@ -971,7 +985,7 @@ function Rentals() {
                       <button className="btn-renovar-masivo" onClick={() => { setModalType("renovarMasivo"); setShowModal(true); }}>
                         ↻ Renovar {selectedCuentas.length} seleccionada(s)
                       </button>
-                      <button className="btn-eliminar-masivo" onClick={() => { setModalType("deleteMasivo"); setShowModal(true); }}>
+                      <button className="btn-eliminar-masivo" onClick={() => openModal("deleteMasivo")}>
                         🗑 Eliminar {selectedCuentas.length} seleccionada(s)
                       </button>
                     </div>
@@ -1081,7 +1095,6 @@ function Rentals() {
               </div>
             )}
 
-            {/* TAB PAGOS */}
             {activeTab === "pagos" && (
               <div className="detail-list">
                 {pagos.length === 0 && <p className="empty-msg">Sin pagos registrados</p>}
@@ -1117,13 +1130,11 @@ function Rentals() {
               </div>
             )}
 
-            {/* TAB GARANTÍAS */}
             {activeTab === "garantias" && (
               <div className="detail-list">
                 {garantias.length === 0 && <p className="empty-msg">Sin garantías registradas</p>}
                 {garantias.map((g, i) => {
                   const rental = clientRentals.find((r) => r.id === g.alquiler_id);
-                  // Extraer correo caído de la descripción
                   const correoCaido = g.descripcion?.replace("Correo caído: ", "") || "";
                   return (
                     <div key={i} className="detail-item garantia-item">
@@ -1151,12 +1162,10 @@ function Rentals() {
         )}
       </div>
 
-      {/* ─── MODALES ─── */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal rentals-modal" onClick={(e) => e.stopPropagation()}>
 
-            {/* MODAL CREAR */}
             {modalType === "crear" && (
               <>
                 <h3>Nuevo Alquiler</h3>
@@ -1280,7 +1289,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL EDITAR */}
             {modalType === "editar" && selectedRental && (
               <>
                 <h3>✏️ Editar Alquiler</h3>
@@ -1346,7 +1354,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL RENOVAR */}
             {modalType === "renovar" && (
               <>
                 <h3>Renovar cuenta</h3>
@@ -1394,7 +1401,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL RENOVAR MASIVO */}
             {modalType === "renovarMasivo" && (
               <>
                 <h3>↻ Renovar cuentas seleccionadas</h3>
@@ -1448,7 +1454,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL GARANTÍA */}
             {modalType === "garantia" && (
               <>
                 <h3>🛡️ Aplicar Garantía</h3>
@@ -1473,7 +1478,6 @@ function Rentals() {
                   </div>
                 )}
 
-                {/* ── TOGGLE USAR INVENTARIO ── */}
                 <div
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
@@ -1571,7 +1575,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL RESOLVER GARANTÍA */}
             {modalType === "resolver" && (
               <>
                 <h3>Resolver Garantía</h3>
@@ -1588,10 +1591,42 @@ function Rentals() {
             {/* MODAL DELETE MASIVO */}
             {modalType === "deleteMasivo" && (
               <>
-                <h3>¿Eliminar cuentas seleccionadas?</h3>
+                <h3>🗑 Eliminar cuentas seleccionadas</h3>
                 <p className="modal-subtitle">
                   Se eliminarán {selectedCuentas.length} cuenta(s) con todos sus pagos y garantías. Esta acción no se puede deshacer.
                 </p>
+
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 6 }}>
+                  ¿Cómo quedan las cuentas en el inventario?
+                </label>
+                <div style={{ display: "flex", gap: "8px", marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className={`dias-btn ${formDeleteOptions.estado_inventario === "Disponible" ? "active" : ""}`}
+                    onClick={() => setFormDeleteOptions({ ...formDeleteOptions, estado_inventario: "Disponible" })}
+                  >
+                    🟢 Disponible
+                  </button>
+                  <button
+                    type="button"
+                    className={`dias-btn ${formDeleteOptions.estado_inventario === "Caída" ? "active" : ""}`}
+                    onClick={() => setFormDeleteOptions({ ...formDeleteOptions, estado_inventario: "Caída" })}
+                  >
+                    🟡 Caída
+                  </button>
+                </div>
+
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Nueva contraseña para estas cuentas (opcional — se aplica a todas)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Dejar vacío para no cambiar la contraseña"
+                  value={formDeleteOptions.new_password}
+                  onChange={(e) => setFormDeleteOptions({ ...formDeleteOptions, new_password: e.target.value })}
+                  style={{ fontFamily: "monospace" }}
+                />
+
                 <div className="modal-actions">
                   <button className="btn-danger" onClick={handleEliminarMasivo}>Eliminar {selectedCuentas.length} cuenta(s)</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1599,7 +1634,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL PAGO MASIVO */}
             {modalType === "pagoMasivo" && (
               <>
                 <h3>💳 Pago masivo</h3>
@@ -1636,7 +1670,7 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL DELETE */}
+            {/* MODAL DELETE INDIVIDUAL */}
             {modalType === "delete" && (
               <>
                 <h3>¿Eliminar alquiler?</h3>
@@ -1644,6 +1678,38 @@ function Rentals() {
                   Se eliminará {selectedRental?.plataforma}
                   {selectedRental?.correo && ` (${selectedRental.correo})`} y todos sus pagos y garantías. Esta acción no se puede deshacer.
                 </p>
+
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 6 }}>
+                  ¿Cómo queda la cuenta en el inventario?
+                </label>
+                <div style={{ display: "flex", gap: "8px", marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className={`dias-btn ${formDeleteOptions.estado_inventario === "Disponible" ? "active" : ""}`}
+                    onClick={() => setFormDeleteOptions({ ...formDeleteOptions, estado_inventario: "Disponible" })}
+                  >
+                    🟢 Disponible
+                  </button>
+                  <button
+                    type="button"
+                    className={`dias-btn ${formDeleteOptions.estado_inventario === "Caída" ? "active" : ""}`}
+                    onClick={() => setFormDeleteOptions({ ...formDeleteOptions, estado_inventario: "Caída" })}
+                  >
+                    🟡 Caída
+                  </button>
+                </div>
+
+                <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 4 }}>
+                  Nueva contraseña para esta cuenta (opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Dejar vacío para no cambiar la contraseña"
+                  value={formDeleteOptions.new_password}
+                  onChange={(e) => setFormDeleteOptions({ ...formDeleteOptions, new_password: e.target.value })}
+                  style={{ fontFamily: "monospace" }}
+                />
+
                 <div className="modal-actions">
                   <button className="btn-danger" onClick={handleDeleteRental}>Eliminar</button>
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -1651,7 +1717,6 @@ function Rentals() {
               </>
             )}
 
-            {/* MODAL CORTAR ALQUILER VENCIDO */}
             {modalType === "cortar" && (
               <>
                 <h3>✂️ Cortar alquiler vencido</h3>
