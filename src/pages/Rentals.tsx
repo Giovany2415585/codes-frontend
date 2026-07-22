@@ -157,13 +157,11 @@ function Rentals() {
   });
   const [formResolver, setFormResolver] = useState({ cuenta_reemplazo: "", notas: "" });
 
-  // ── Opciones al eliminar (individual o masivo): estado del inventario + nueva contraseña ──
   const [formDeleteOptions, setFormDeleteOptions] = useState({
     estado_inventario: "Disponible" as "Disponible" | "Caída",
     new_password: "",
   });
 
-  // ── Inventario para Garantía ────────────────────────────────────────────────
   const [usarInventarioGarantia, setUsarInventarioGarantia] = useState(false);
   const [cuentasInventarioGarantia, setCuentasInventarioGarantia] = useState<InventarioCuenta[]>([]);
   const [inventarioSeleccionadoGarantia, setInventarioSeleccionadoGarantia] = useState<number | "">("");
@@ -406,41 +404,36 @@ function Rentals() {
     setSelectedClient(userId);
     setActiveTab("cuentas");
     const clientRentalsLocal = rentals.filter((r) => r.user_id === userId);
-    const allPagos: Pago[] = [];
-    const allGarantias: Garantia[] = [];
-    for (const r of clientRentalsLocal) {
-      try {
-        const [p, g] = await Promise.all([
-          apiFetch(`/api/alquileres/${r.id}/pagos`),
-          apiFetch(`/api/alquileres/${r.id}/garantias`),
-        ]);
-        allPagos.push(...p);
-        allGarantias.push(...g);
-      } catch {}
+    const ids = clientRentalsLocal.map((r) => r.id);
+    if (ids.length === 0) {
+      setPagos([]);
+      setGarantias([]);
+      return;
     }
-    setPagos(allPagos);
-    setGarantias(allGarantias);
+    try {
+      const data = await apiFetch(`/api/alquileres/pagos-garantias?ids=${ids.join(",")}`);
+      setPagos(data.pagos || []);
+      setGarantias(data.garantias || []);
+    } catch {
+      setPagos([]);
+      setGarantias([]);
+    }
   };
 
   const refreshClientDetail = async (userId: number) => {
     try {
       const freshRentals: Rental[] = await apiFetch("/api/alquileres");
       const clientRentalsLocal = freshRentals.filter((r) => r.user_id === userId);
-      const allPagos: Pago[] = [];
-      const allGarantias: Garantia[] = [];
-      for (const r of clientRentalsLocal) {
-        try {
-          const [p, g] = await Promise.all([
-            apiFetch(`/api/alquileres/${r.id}/pagos`),
-            apiFetch(`/api/alquileres/${r.id}/garantias`),
-          ]);
-          allPagos.push(...p);
-          allGarantias.push(...g);
-        } catch {}
-      }
+      const ids = clientRentalsLocal.map((r) => r.id);
       setRentals(freshRentals);
-      setPagos(allPagos);
-      setGarantias(allGarantias);
+      if (ids.length === 0) {
+        setPagos([]);
+        setGarantias([]);
+        return;
+      }
+      const data = await apiFetch(`/api/alquileres/pagos-garantias?ids=${ids.join(",")}`);
+      setPagos(data.pagos || []);
+      setGarantias(data.garantias || []);
     } catch {}
   };
 
