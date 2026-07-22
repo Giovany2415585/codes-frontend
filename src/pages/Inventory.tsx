@@ -21,6 +21,12 @@ interface InventarioItem {
 
 const LIMIT = 50;
 
+const DEFAULT_PLATAFORMAS = [
+  "Netflix", "Max Platino", "Disney+", "Crunchyroll", "Prime Video",
+  "Paramount+", "HBO Max", "Universal+", "Spotify", "YouTube Premium",
+  "ChatGPT", "Canva", "CapCut", "Gemini", "VIX", "Amazon Prime"
+];
+
 function Inventory() {
   const [items, setItems] = useState<InventarioItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -43,6 +49,11 @@ function Inventory() {
   const [bulkText, setBulkText] = useState("");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
+  // ── Plataformas dinámicas (compartidas con Alquileres) ─────────────────────
+  const [plataformas, setPlataformas] = useState<string[]>(DEFAULT_PLATAFORMAS);
+  const [showNuevaPlataforma, setShowNuevaPlataforma] = useState<null | "form" | "bulk">(null);
+  const [nuevaPlataformaInput, setNuevaPlataformaInput] = useState("");
+
   const [formData, setFormData] = useState({
     correo: "",
     password: "",
@@ -55,15 +66,10 @@ function Inventory() {
     estado: "Disponible" as "Disponible" | "Ocupada" | "Caída",
   });
 
-  const plataformas = [
-    "Netflix", "Max Platino", "Disney+", "Crunchyroll", "Prime Video",
-    "Paramount+", "HBO Max", "Universal+", "Spotify", "YouTube Premium",
-    "ChatGPT", "Canva", "CapCut", "Gemini", "VIX", "Amazon Prime"
-  ];
-
   useEffect(() => {
     loadInventario(1);
     loadDisponiblesResumen();
+    loadPlataformas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -71,6 +77,39 @@ function Inventory() {
     loadInventario(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plataformaFilter, estadoFilter]);
+
+  const loadPlataformas = async () => {
+    try {
+      const data = await apiFetch("/api/alquileres/plataformas");
+      if (Array.isArray(data) && data.length > 0) {
+        setPlataformas(data.map((p: any) => p.nombre));
+      }
+    } catch {
+      // se queda con la lista por defecto si falla
+    }
+  };
+
+  const handleAgregarPlataforma = async () => {
+    const nombre = nuevaPlataformaInput.trim();
+    if (!nombre) return;
+    try {
+      await apiFetch("/api/alquileres/plataformas", {
+        method: "POST",
+        body: JSON.stringify({ nombre }),
+      });
+      toast.success(`Plataforma "${nombre}" agregada`);
+      await loadPlataformas();
+      if (showNuevaPlataforma === "form") {
+        setFormData((f) => ({ ...f, plataforma: nombre }));
+      } else if (showNuevaPlataforma === "bulk") {
+        setBulkPlataforma(nombre);
+      }
+      setNuevaPlataformaInput("");
+      setShowNuevaPlataforma(null);
+    } catch (err: any) {
+      toast.error(err.message || "Error agregando plataforma");
+    }
+  };
 
   const loadInventario = async (page: number, searchOverride?: string) => {
     setLoading(true);
@@ -444,13 +483,35 @@ function Inventory() {
             <label style={fieldLabelStyle}>Plataforma</label>
             <select
               value={formData.plataforma}
-              onChange={(e) => setFormData({ ...formData, plataforma: e.target.value })}
+              onChange={(e) => {
+                if (e.target.value === "__nueva__") {
+                  setShowNuevaPlataforma("form");
+                } else {
+                  setFormData({ ...formData, plataforma: e.target.value });
+                }
+              }}
             >
               <option value="">Selecciona plataforma</option>
               {plataformas.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
+              <option value="__nueva__">➕ Agregar nueva plataforma...</option>
             </select>
+            {showNuevaPlataforma === "form" && (
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                <input
+                  type="text"
+                  placeholder="Nombre de la nueva plataforma"
+                  value={nuevaPlataformaInput}
+                  onChange={(e) => setNuevaPlataformaInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()}
+                  autoFocus
+                  style={{ flex: 1 }}
+                />
+                <button type="button" onClick={handleAgregarPlataforma}>Agregar</button>
+                <button type="button" onClick={() => { setShowNuevaPlataforma(null); setNuevaPlataformaInput(""); }}>✕</button>
+              </div>
+            )}
 
             <label style={fieldLabelStyle}>Proveedor</label>
             <input
@@ -521,12 +582,37 @@ function Inventory() {
             <h2>📥 Carga masiva de cuentas</h2>
 
             <label style={fieldLabelStyle}>Plataforma (para todo el lote)</label>
-            <select value={bulkPlataforma} onChange={(e) => setBulkPlataforma(e.target.value)}>
+            <select
+              value={bulkPlataforma}
+              onChange={(e) => {
+                if (e.target.value === "__nueva__") {
+                  setShowNuevaPlataforma("bulk");
+                } else {
+                  setBulkPlataforma(e.target.value);
+                }
+              }}
+            >
               <option value="">Selecciona plataforma</option>
               {plataformas.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
+              <option value="__nueva__">➕ Agregar nueva plataforma...</option>
             </select>
+            {showNuevaPlataforma === "bulk" && (
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                <input
+                  type="text"
+                  placeholder="Nombre de la nueva plataforma"
+                  value={nuevaPlataformaInput}
+                  onChange={(e) => setNuevaPlataformaInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAgregarPlataforma()}
+                  autoFocus
+                  style={{ flex: 1 }}
+                />
+                <button type="button" onClick={handleAgregarPlataforma}>Agregar</button>
+                <button type="button" onClick={() => { setShowNuevaPlataforma(null); setNuevaPlataformaInput(""); }}>✕</button>
+              </div>
+            )}
 
             <label style={fieldLabelStyle}>Proveedor (para todo el lote, opcional)</label>
             <input
