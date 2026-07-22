@@ -118,6 +118,7 @@ function Users() {
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#6366f1");
   const [showTagManager, setShowTagManager] = useState(false);
+  const [asignandoAsunto, setAsignandoAsunto] = useState(false);
 
   // ── Estado para alquiler rápido ─────────────────────────────────────────────
   const [plataformas, setPlataformas] = useState<Plataforma[]>([]);
@@ -375,6 +376,8 @@ function Users() {
     if (!selectedUser) { toast.error(t("users.selectUserFirst")); return; }
     if (selectedEmailIds.length === 0) { toast.error("Selecciona al menos un correo"); return; }
     if (!bulkSubjectName.trim()) { toast.error("Escribe el asunto"); return; }
+    if (asignandoAsunto) return;
+    setAsignandoAsunto(true);
     try {
       await apiFetch("/api/admin/subjects/bulk-multi-email", {
         method: "POST",
@@ -386,6 +389,8 @@ function Users() {
       loadSavedSubjects();
     } catch (err: any) {
       toast.error(err.message || "Error asignando asunto");
+    } finally {
+      setAsignandoAsunto(false);
     }
   };
 
@@ -1284,8 +1289,8 @@ function Users() {
             {selectedEmailIds.length > 0 && (
               <form onSubmit={handleAssignSubjectToMultiple} className="crud-form bulk-subject-form">
                 <p className="bulk-subject-label">Asignar asunto a {selectedEmailIds.length} correo(s) seleccionado(s):</p>
-                <input placeholder="Escribe el asunto..." value={bulkSubjectName} onChange={(e) => setBulkSubjectName(e.target.value)} />
-                <button type="submit">Asignar a todos</button>
+                <input placeholder="Escribe el asunto..." value={bulkSubjectName} onChange={(e) => setBulkSubjectName(e.target.value)} disabled={asignandoAsunto} />
+                <button type="submit" disabled={asignandoAsunto}>{asignandoAsunto ? "Asignando..." : "Asignar a todos"}</button>
               </form>
             )}
           </div>
