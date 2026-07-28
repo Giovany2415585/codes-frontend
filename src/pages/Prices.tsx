@@ -167,17 +167,24 @@ function Prices() {
     setSelectedIds(newSelected);
   };
 
-  const handleSendToTelegram = async (ids?: number[]) => {
+  const handleSendToTelegram = async (ids?: number[], formato: "texto" | "archivo" = "texto") => {
     try {
-      const body = ids && ids.length > 0 ? { ids } : {};
+      const body: any = {};
+      if (ids && ids.length > 0) body.ids = ids;
+      if (formato === "archivo") body.formato = "archivo";
+
       await apiFetch("/api/admin/precios/send-telegram", {
         method: "POST",
         body: JSON.stringify(body),
       });
-      toast.success("Precios enviados a Telegram");
+      toast.success(
+        formato === "archivo"
+          ? "Precios enviados como archivo a Telegram"
+          : "Precios enviados a Telegram"
+      );
       setSelectedIds(new Set());
-    } catch {
-      toast.error("Error enviando precios");
+    } catch (err: any) {
+      toast.error(err.message || "Error enviando precios");
     }
   };
 
@@ -293,13 +300,21 @@ function Prices() {
       )}
 
       <div className="prices-actions">
-        <button className="btn-telegram" onClick={() => handleSendToTelegram()}>
-          📢 Enviar todos los precios
+        <button className="btn-telegram" onClick={() => handleSendToTelegram(undefined, "texto")}>
+          📢 Enviar todos (texto)
+        </button>
+        <button className="btn-telegram" onClick={() => handleSendToTelegram(undefined, "archivo")}>
+          📄 Enviar todos (archivo .txt)
         </button>
         {selectedIds.size > 0 && (
-          <button className="btn-telegram" onClick={() => handleSendToTelegram(Array.from(selectedIds))}>
-            📢 Enviar {selectedIds.size} seleccionado(s)
-          </button>
+          <>
+            <button className="btn-telegram" onClick={() => handleSendToTelegram(Array.from(selectedIds), "texto")}>
+              📢 Enviar {selectedIds.size} seleccionado(s) (texto)
+            </button>
+            <button className="btn-telegram" onClick={() => handleSendToTelegram(Array.from(selectedIds), "archivo")}>
+              📄 Enviar {selectedIds.size} seleccionado(s) (archivo)
+            </button>
+          </>
         )}
       </div>
 
